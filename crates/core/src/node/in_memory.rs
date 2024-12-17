@@ -25,7 +25,7 @@ use anvil_zksync_config::constants::{
 };
 use anvil_zksync_config::types::{
     CacheConfig, Genesis, ShowCalls, ShowGasDetails, ShowStorageLogs, ShowVMDetails,
-    SystemContractsOptions,
+    SystemContractsOptions, TransactionOrder,
 };
 use anvil_zksync_config::TestNodeConfig;
 use colored::Colorize;
@@ -1108,7 +1108,7 @@ fn contract_address_from_tx_result(execution_result: &VmExecutionResultAndLogs) 
 impl Default for InMemoryNode {
     fn default() -> Self {
         let impersonation = ImpersonationManager::default();
-        let pool = TxPool::new(impersonation.clone());
+        let pool = TxPool::new(impersonation.clone(), TransactionOrder::Fifo);
         let tx_listener = pool.add_tx_listener();
         InMemoryNode::new(
             None,
@@ -1161,7 +1161,7 @@ impl InMemoryNode {
     // TODO: Refactor InMemoryNode with a builder pattern
     pub fn default_fork(fork: Option<ForkDetails>) -> Self {
         let impersonation = ImpersonationManager::default();
-        let pool = TxPool::new(impersonation.clone());
+        let pool = TxPool::new(impersonation.clone(), TransactionOrder::Fifo);
         let tx_listener = pool.add_tx_listener();
         Self::new(
             fork,
@@ -1263,7 +1263,10 @@ impl InMemoryNode {
         tracing::debug!(count = txs.len(), "applying transactions");
 
         // Create a temporary tx pool (i.e. state is not shared with the node mempool).
-        let pool = TxPool::new(self.impersonation.clone());
+        let pool = TxPool::new(
+            self.impersonation.clone(),
+            self.read_inner()?.config.transaction_order,
+        );
         pool.add_txs(txs);
 
         // Lock time so that the produced blocks are guaranteed to be sequential in time.
@@ -2035,7 +2038,7 @@ mod tests {
         DEFAULT_ESTIMATE_GAS_SCALE_FACTOR, DEFAULT_FAIR_PUBDATA_PRICE, DEFAULT_L2_GAS_PRICE,
         TEST_NODE_NETWORK_ID,
     };
-    use anvil_zksync_config::types::SystemContractsOptions;
+    use anvil_zksync_config::types::{SystemContractsOptions, TransactionOrder};
     use anvil_zksync_config::TestNodeConfig;
     use ethabi::{Token, Uint};
     use zksync_types::{utils::deployed_address_create, K256PrivateKey, Nonce};
@@ -2160,7 +2163,7 @@ mod tests {
             raw_storage: external_storage.inner.read().unwrap().raw_storage.clone(),
         };
         let impersonation = ImpersonationManager::default();
-        let pool = TxPool::new(impersonation.clone());
+        let pool = TxPool::new(impersonation.clone(), TransactionOrder::Fifo);
         let sealer = BlockSealer::new(BlockSealerMode::immediate(1000, pool.add_tx_listener()));
         let node = InMemoryNode::new(
             Some(ForkDetails {
@@ -2200,7 +2203,7 @@ mod tests {
     #[tokio::test]
     async fn test_transact_returns_data_in_built_in_without_security_mode() {
         let impersonation = ImpersonationManager::default();
-        let pool = TxPool::new(impersonation.clone());
+        let pool = TxPool::new(impersonation.clone(), TransactionOrder::Fifo);
         let sealer = BlockSealer::new(BlockSealerMode::immediate(1000, pool.add_tx_listener()));
         let node = InMemoryNode::new(
             None,

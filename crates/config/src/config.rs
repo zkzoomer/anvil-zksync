@@ -115,6 +115,8 @@ pub struct TestNodeConfig {
     pub allow_origin: String,
     /// Disable CORS if true
     pub no_cors: bool,
+    /// How transactions are sorted in the mempool
+    pub transaction_order: TransactionOrder,
 }
 
 impl Default for TestNodeConfig {
@@ -175,6 +177,7 @@ impl Default for TestNodeConfig {
             no_mining: false,
 
             max_transactions: 1000,
+            transaction_order: TransactionOrder::Fifo,
 
             // Server configuration
             allow_origin: "*".to_string(),
@@ -875,6 +878,13 @@ impl TestNodeConfig {
     #[must_use]
     pub fn with_no_mining(mut self, no_mining: bool) -> Self {
         self.no_mining = no_mining;
+        self
+    }
+
+    // Set transactions order in the mempool
+    #[must_use]
+    pub fn with_transaction_order(mut self, transaction_order: TransactionOrder) -> Self {
+        self.transaction_order = transaction_order;
         self
     }
 
