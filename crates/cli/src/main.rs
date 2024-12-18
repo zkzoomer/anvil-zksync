@@ -1,6 +1,7 @@
 use crate::bytecode_override::override_bytecodes;
 use crate::cli::{Cli, Command};
 use crate::utils::update_with_fork_details;
+use anvil_zksync_api_server::NodeServerBuilder;
 use anvil_zksync_config::constants::{
     DEFAULT_ESTIMATE_GAS_PRICE_SCALE_FACTOR, DEFAULT_ESTIMATE_GAS_SCALE_FACTOR,
     DEFAULT_FAIR_PUBDATA_PRICE, DEFAULT_L1_GAS_PRICE, DEFAULT_L2_GAS_PRICE, LEGACY_RICH_WALLETS,
@@ -9,29 +10,17 @@ use anvil_zksync_config::constants::{
 use anvil_zksync_config::types::SystemContractsOptions;
 use anvil_zksync_config::ForkPrintInfo;
 use anvil_zksync_core::fork::ForkDetails;
-use anvil_zksync_core::namespaces::{
-    AnvilNamespaceT, ConfigurationApiNamespaceT, DebugNamespaceT, EthNamespaceT,
-    EthTestNodeNamespaceT, EvmNamespaceT, HardhatNamespaceT, NetNamespaceT, Web3NamespaceT,
-    ZksNamespaceT,
-};
 use anvil_zksync_core::node::{
     BlockProducer, BlockSealer, BlockSealerMode, ImpersonationManager, InMemoryNode,
     TimestampManager, TxPool,
 };
 use anvil_zksync_core::observability::Observability;
 use anvil_zksync_core::system_contracts::SystemContracts;
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use clap::Parser;
-use futures::{
-    channel::oneshot,
-    future::{self},
-    FutureExt,
-};
-use jsonrpc_core::MetaIoHandler;
-use jsonrpc_http_server::DomainsValidation;
-use logging_middleware::LoggingMiddleware;
 use std::fs::File;
 use std::{env, net::SocketAddr, str::FromStr};
+use tower_http::cors::AllowOrigin;
 use tracing_subscriber::filter::LevelFilter;
 use zksync_types::fee_model::{FeeModelConfigV2, FeeParams};
 use zksync_types::H160;
@@ -39,65 +28,7 @@ use zksync_web3_decl::namespaces::ZksNamespaceClient;
 
 mod bytecode_override;
 mod cli;
-mod logging_middleware;
 mod utils;
-
-#[allow(clippy::too_many_arguments)]
-async fn build_json_http(
-    addr: SocketAddr,
-    log_level_filter: LevelFilter,
-    node: InMemoryNode,
-    enable_health_api: bool,
-    cors_allow_origin: String,
-    disable_cors: bool,
-) -> tokio::task::JoinHandle<()> {
-    let (sender, recv) = oneshot::channel::<()>();
-
-    let io_handler = {
-        let mut io = MetaIoHandler::with_middleware(LoggingMiddleware::new(log_level_filter));
-
-        io.extend_with(NetNamespaceT::to_delegate(node.clone()));
-        io.extend_with(Web3NamespaceT::to_delegate(node.clone()));
-        io.extend_with(ConfigurationApiNamespaceT::to_delegate(node.clone()));
-        io.extend_with(DebugNamespaceT::to_delegate(node.clone()));
-        io.extend_with(EthNamespaceT::to_delegate(node.clone()));
-        io.extend_with(EthTestNodeNamespaceT::to_delegate(node.clone()));
-        io.extend_with(AnvilNamespaceT::to_delegate(node.clone()));
-        io.extend_with(EvmNamespaceT::to_delegate(node.clone()));
-        io.extend_with(HardhatNamespaceT::to_delegate(node.clone()));
-        io.extend_with(ZksNamespaceT::to_delegate(node));
-        io
-    };
-
-    std::thread::spawn(move || {
-        let runtime = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .worker_threads(1)
-            .build()
-            .unwrap();
-
-        let allow_origin = if disable_cors {
-            "null"
-        } else {
-            &cors_allow_origin
-        };
-        let mut builder = jsonrpc_http_server::ServerBuilder::new(io_handler)
-            .threads(1)
-            .event_loop_executor(runtime.handle().clone())
-            .cors(DomainsValidation::AllowOnly(vec![allow_origin.into()]));
-
-        if enable_health_api {
-            builder = builder.health_api(("/health", "web3_clientVersion"));
-        }
-
-        let server = builder.start_http(&addr).unwrap();
-
-        server.wait();
-        drop(sender);
-    });
-
-    tokio::spawn(recv.map(drop))
-}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -323,18 +254,28 @@ async fn main() -> anyhow::Result<()> {
         node.set_rich_account(H160::from_str(address).unwrap(), config.genesis_balance);
     }
 
-    let mut threads = future::join_all(config.host.iter().map(|host| {
+    let mut server_builder = NodeServerBuilder::new(
+        node.clone(),
+        AllowOrigin::exact(
+            config
+                .allow_origin
+                .parse()
+                .context("allow origin is malformed")?,
+        ),
+    );
+    if config.health_check_endpoint {
+        server_builder.enable_health_api()
+    }
+    if !config.no_cors {
+        server_builder.enable_cors();
+    }
+    let mut server_handles = Vec::with_capacity(config.host.len());
+    for host in &config.host {
         let addr = SocketAddr::new(*host, config.port);
-        build_json_http(
-            addr,
-            log_level_filter,
-            node.clone(),
-            config.health_check_endpoint,
-            config.allow_origin.clone(),
-            config.no_cors,
-        )
-    }))
-    .await;
+        server_handles.push(server_builder.clone().build(addr).await.run());
+    }
+    let any_server_stopped =
+        futures::future::select_all(server_handles.into_iter().map(|h| Box::pin(h.stopped())));
 
     let system_contracts =
         SystemContracts::from_options(&config.system_contracts_options, config.use_evm_emulator);
@@ -344,11 +285,20 @@ async fn main() -> anyhow::Result<()> {
         block_sealer,
         system_contracts,
     ));
-    threads.push(block_producer_handle);
 
     config.print(fork_print_info.as_ref());
 
-    future::select_all(threads).await.0.unwrap();
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => {
+            tracing::trace!("received shutdown signal, shutting down");
+        },
+        _ = any_server_stopped => {
+            tracing::trace!("node server was stopped")
+        },
+        _ = block_producer_handle => {
+            tracing::trace!("block producer was stopped")
+        }
+    }
 
     Ok(())
 }

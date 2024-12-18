@@ -4,10 +4,12 @@ use anvil_zksync_config::constants::{
     DEFAULT_DISK_CACHE_DIR, DEFAULT_MNEMONIC, TEST_NODE_NETWORK_ID,
 };
 use anvil_zksync_config::types::{
-    AccountGenerator, CacheConfig, CacheType, Genesis, LogLevel, ShowCalls, ShowGasDetails,
-    ShowStorageLogs, ShowVMDetails, SystemContractsOptions,
+    AccountGenerator, CacheConfig, CacheType, Genesis, SystemContractsOptions,
 };
-use anvil_zksync_config::{types::TransactionOrder, TestNodeConfig};
+use anvil_zksync_config::TestNodeConfig;
+use anvil_zksync_types::{
+    LogLevel, ShowCalls, ShowGasDetails, ShowStorageLogs, ShowVMDetails, TransactionOrder,
+};
 use clap::{arg, command, Parser, Subcommand};
 use rand::{rngs::StdRng, SeedableRng};
 use std::env;
@@ -249,8 +251,8 @@ pub struct Cli {
     pub allow_origin: String,
 
     /// Disable CORS.
-    #[arg(long, default_missing_value = "true", num_args(0..=1), conflicts_with = "allow_origin", help_heading = "Server options")]
-    pub no_cors: Option<bool>,
+    #[arg(long, conflicts_with = "allow_origin", help_heading = "Server options")]
+    pub no_cors: bool,
 
     /// Transaction ordering in the mempool.
     #[arg(long, default_value = "fifo")]

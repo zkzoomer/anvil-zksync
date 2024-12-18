@@ -1,232 +1,153 @@
-use std::sync::Arc;
-
+use crate::deps::storage_view::StorageView;
+use crate::node::{InMemoryNode, MAX_TX_SIZE};
+use crate::utils::{create_debug_output, to_real_block_number};
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
-use zksync_multivm::{
-    interface::{VmFactory, VmInterface},
-    tracers::CallTracer,
-    vm_latest::{constants::ETH_CALL_GAS_LIMIT, HistoryDisabled, ToTracerPointer, Vm},
+use std::sync::Arc;
+use zksync_multivm::interface::{VmFactory, VmInterface};
+use zksync_multivm::tracers::CallTracer;
+use zksync_multivm::vm_latest::constants::ETH_CALL_GAS_LIMIT;
+use zksync_multivm::vm_latest::{HistoryDisabled, ToTracerPointer, Vm};
+use zksync_types::api::{
+    BlockId, BlockNumber, CallTracerBlockResult, CallTracerResult, ResultDebugCall, TracerConfig,
+    TransactionVariant,
 };
-use zksync_types::{
-    api::{BlockId, BlockNumber, DebugCall, ResultDebugCall, TracerConfig, TransactionVariant},
-    l2::L2Tx,
-    transaction_request::CallRequest,
-    PackedEthSignature, Transaction, H256, U64,
-};
+use zksync_types::l2::L2Tx;
+use zksync_types::transaction_request::CallRequest;
+use zksync_types::{PackedEthSignature, Transaction, H256, U64};
 use zksync_web3_decl::error::Web3Error;
 
-use crate::{
-    deps::storage_view::StorageView,
-    namespaces::{DebugNamespaceT, Result, RpcResult},
-    node::{InMemoryNode, MAX_TX_SIZE},
-    utils::{create_debug_output, into_jsrpc_error, to_real_block_number},
-};
-
-impl DebugNamespaceT for InMemoryNode {
-    fn trace_block_by_number(
+impl InMemoryNode {
+    pub async fn trace_block_by_number_impl(
         &self,
         block: BlockNumber,
         options: Option<TracerConfig>,
-    ) -> RpcResult<Vec<ResultDebugCall>> {
-        let only_top = options.is_some_and(|o| o.tracer_config.only_top_call);
-        let inner = self.get_inner().clone();
-        Box::pin(async move {
-            let inner = inner.read().map_err(|_| {
-                into_jsrpc_error(Web3Error::InternalError(anyhow::Error::msg(
-                    "Failed to acquire read lock for inner node state.",
-                )))
-            })?;
+    ) -> anyhow::Result<CallTracerBlockResult> {
+        let current_miniblock = self.read_inner()?.current_miniblock;
+        let number = to_real_block_number(block, U64::from(current_miniblock)).as_u64();
+        let block_hash = *self
+            .read_inner()?
+            .block_hashes
+            .get(&number)
+            .ok_or_else(|| anyhow::anyhow!("Block (id={block}) not found"))?;
 
-            let block = {
-                let number =
-                    to_real_block_number(block, U64::from(inner.current_miniblock)).as_u64();
-
-                inner
-                    .block_hashes
-                    .get(&number)
-                    .and_then(|hash| inner.blocks.get(hash))
-                    .ok_or_else(|| {
-                        into_jsrpc_error(Web3Error::SubmitTransactionError(
-                            "Block not found".to_string(),
-                            vec![],
-                        ))
-                    })?
-            };
-
-            let tx_hashes = block
-                .transactions
-                .iter()
-                .map(|tx| match tx {
-                    TransactionVariant::Full(tx) => tx.hash,
-                    TransactionVariant::Hash(hash) => *hash,
-                })
-                .collect_vec();
-
-            let debug_calls = tx_hashes
-                .into_iter()
-                .map(|tx_hash| {
-                    let tx = inner.tx_results.get(&tx_hash).ok_or_else(|| {
-                        into_jsrpc_error(Web3Error::SubmitTransactionError(
-                            "Transaction not found".to_string(),
-                            vec![],
-                        ))
-                    })?;
-                    Ok(tx.debug_info(only_top))
-                })
-                .collect::<Result<Vec<_>>>()?
-                .into_iter()
-                .map(|result| ResultDebugCall { result })
-                .collect_vec();
-
-            Ok(debug_calls)
-        })
+        self.trace_block_by_hash_impl(block_hash, options).await
     }
 
-    fn trace_block_by_hash(
+    pub async fn trace_block_by_hash_impl(
         &self,
         hash: H256,
         options: Option<TracerConfig>,
-    ) -> RpcResult<Vec<ResultDebugCall>> {
+    ) -> anyhow::Result<CallTracerBlockResult> {
         let only_top = options.is_some_and(|o| o.tracer_config.only_top_call);
-        let inner = self.get_inner().clone();
-        Box::pin(async move {
-            let inner = inner.read().map_err(|_| {
-                into_jsrpc_error(Web3Error::InternalError(anyhow::Error::msg(
-                    "Failed to acquire read lock for inner node state.",
-                )))
-            })?;
 
-            let block = inner.blocks.get(&hash).ok_or_else(|| {
-                into_jsrpc_error(Web3Error::SubmitTransactionError(
-                    "Block not found".to_string(),
-                    vec![],
-                ))
-            })?;
+        let tx_hashes = self
+            .read_inner()?
+            .blocks
+            .get(&hash)
+            .ok_or_else(|| anyhow::anyhow!("Block (hash={hash}) not found"))?
+            .transactions
+            .iter()
+            .map(|tx| match tx {
+                TransactionVariant::Full(tx) => tx.hash,
+                TransactionVariant::Hash(hash) => *hash,
+            })
+            .collect_vec();
 
-            let tx_hashes = block
-                .transactions
-                .iter()
-                .map(|tx| match tx {
-                    TransactionVariant::Full(tx) => tx.hash,
-                    TransactionVariant::Hash(hash) => *hash,
-                })
-                .collect_vec();
+        let debug_calls = tx_hashes
+            .into_iter()
+            .map(|tx_hash| {
+                Ok(self
+                    .read_inner()?
+                    .tx_results
+                    .get(&tx_hash)
+                    .ok_or_else(|| anyhow::anyhow!("Transaction (hash={tx_hash}) not found"))?
+                    .debug_info(only_top))
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?
+            .into_iter()
+            .map(|result| ResultDebugCall { result })
+            .collect_vec();
 
-            let debug_calls = tx_hashes
-                .into_iter()
-                .map(|tx_hash| {
-                    let tx = inner.tx_results.get(&tx_hash).ok_or_else(|| {
-                        into_jsrpc_error(Web3Error::SubmitTransactionError(
-                            "Transaction not found".to_string(),
-                            vec![],
-                        ))
-                    })?;
-                    Ok(tx.debug_info(only_top))
-                })
-                .collect::<Result<Vec<_>>>()?
-                .into_iter()
-                .map(|result| ResultDebugCall { result })
-                .collect_vec();
-
-            Ok(debug_calls)
-        })
+        Ok(CallTracerBlockResult::CallTrace(debug_calls))
     }
 
-    /// Trace execution of a transaction.
-    fn trace_call(
+    pub async fn trace_call_impl(
         &self,
         request: CallRequest,
         block: Option<BlockId>,
         options: Option<TracerConfig>,
-    ) -> RpcResult<DebugCall> {
+    ) -> Result<CallTracerResult, Web3Error> {
         let only_top = options.is_some_and(|o| o.tracer_config.only_top_call);
-        let inner = self.get_inner().clone();
-        let time = self.time.clone();
-        let system_contracts = self.system_contracts.contracts_for_l2_call().clone();
-        Box::pin(async move {
-            if block.is_some() && !matches!(block, Some(BlockId::Number(BlockNumber::Latest))) {
-                return Err(jsonrpc_core::Error::invalid_params(
-                    "tracing only supported at `latest` block",
-                ));
-            }
+        let inner = self.read_inner()?;
+        let system_contracts = self.system_contracts.contracts_for_l2_call();
+        if block.is_some() && !matches!(block, Some(BlockId::Number(BlockNumber::Latest))) {
+            return Err(Web3Error::InternalError(anyhow::anyhow!(
+                "tracing only supported at `latest` block"
+            )));
+        }
 
-            let inner = inner.read().map_err(|_| {
-                into_jsrpc_error(Web3Error::InternalError(anyhow::Error::msg(
-                    "Failed to acquire read lock for inner node state.",
-                )))
-            })?;
+        let allow_no_target = system_contracts.evm_emulator.is_some();
+        let mut l2_tx = L2Tx::from_request(request.into(), MAX_TX_SIZE, allow_no_target)
+            .map_err(Web3Error::SerializationError)?;
+        let execution_mode = zksync_multivm::interface::TxExecutionMode::EthCall;
+        let storage = StorageView::new(&inner.fork_storage).into_rc_ptr();
 
-            let allow_no_target = system_contracts.evm_emulator.is_some();
-            let mut l2_tx = L2Tx::from_request(request.into(), MAX_TX_SIZE, allow_no_target)
-                .map_err(|err| into_jsrpc_error(Web3Error::SerializationError(err)))?;
-            let execution_mode = zksync_multivm::interface::TxExecutionMode::EthCall;
-            let storage = StorageView::new(&inner.fork_storage).into_rc_ptr();
+        // init vm
+        let (mut l1_batch_env, _block_context) =
+            inner.create_l1_batch_env(&self.time, storage.clone());
 
-            // init vm
-            let (mut l1_batch_env, _block_context) =
-                inner.create_l1_batch_env(&time, storage.clone());
+        // update the enforced_base_fee within l1_batch_env to match the logic in zksync_core
+        l1_batch_env.enforced_base_fee = Some(l2_tx.common_data.fee.max_fee_per_gas.as_u64());
+        let system_env = inner.create_system_env(system_contracts.clone(), execution_mode);
+        let mut vm: Vm<_, HistoryDisabled> = Vm::new(l1_batch_env, system_env, storage);
 
-            // update the enforced_base_fee within l1_batch_env to match the logic in zksync_core
-            l1_batch_env.enforced_base_fee = Some(l2_tx.common_data.fee.max_fee_per_gas.as_u64());
-            let system_env = inner.create_system_env(system_contracts.clone(), execution_mode);
-            let mut vm: Vm<_, HistoryDisabled> = Vm::new(l1_batch_env, system_env, storage);
+        // We must inject *some* signature (otherwise bootloader code fails to generate hash).
+        if l2_tx.common_data.signature.is_empty() {
+            l2_tx.common_data.signature = PackedEthSignature::default().serialize_packed().into();
+        }
 
-            // We must inject *some* signature (otherwise bootloader code fails to generate hash).
-            if l2_tx.common_data.signature.is_empty() {
-                l2_tx.common_data.signature =
-                    PackedEthSignature::default().serialize_packed().into();
-            }
+        // Match behavior of zksync_core:
+        // Protection against infinite-loop eth_calls and alike:
+        // limiting the amount of gas the call can use.
+        l2_tx.common_data.fee.gas_limit = ETH_CALL_GAS_LIMIT.into();
 
-            // Match behavior of zksync_core:
-            // Protection against infinite-loop eth_calls and alike:
-            // limiting the amount of gas the call can use.
-            l2_tx.common_data.fee.gas_limit = ETH_CALL_GAS_LIMIT.into();
+        let tx: Transaction = l2_tx.clone().into();
+        vm.push_transaction(tx);
 
-            let tx: Transaction = l2_tx.clone().into();
-            vm.push_transaction(tx);
+        let call_tracer_result = Arc::new(OnceCell::default());
+        let tracer = CallTracer::new(call_tracer_result.clone()).into_tracer_pointer();
 
-            let call_tracer_result = Arc::new(OnceCell::default());
-            let tracer = CallTracer::new(call_tracer_result.clone()).into_tracer_pointer();
+        let tx_result = vm.inspect(
+            &mut tracer.into(),
+            zksync_multivm::interface::InspectExecutionMode::OneTx,
+        );
+        let call_traces = if only_top {
+            vec![]
+        } else {
+            Arc::try_unwrap(call_tracer_result)
+                .unwrap()
+                .take()
+                .unwrap_or_default()
+        };
 
-            let tx_result = vm.inspect(
-                &mut tracer.into(),
-                zksync_multivm::interface::InspectExecutionMode::OneTx,
-            );
-            let call_traces = if only_top {
-                vec![]
-            } else {
-                Arc::try_unwrap(call_tracer_result)
-                    .unwrap()
-                    .take()
-                    .unwrap_or_default()
-            };
+        let debug = create_debug_output(&l2_tx, &tx_result, call_traces)?;
 
-            let debug =
-                create_debug_output(&l2_tx, &tx_result, call_traces).map_err(into_jsrpc_error)?;
-
-            Ok(debug)
-        })
+        Ok(CallTracerResult::CallTrace(debug))
     }
 
-    fn trace_transaction(
+    pub async fn trace_transaction_impl(
         &self,
         tx_hash: H256,
         options: Option<TracerConfig>,
-    ) -> RpcResult<Option<DebugCall>> {
+    ) -> anyhow::Result<Option<CallTracerResult>> {
         let only_top = options.is_some_and(|o| o.tracer_config.only_top_call);
-        let inner = self.get_inner().clone();
-        Box::pin(async move {
-            let inner = inner.read().map_err(|_| {
-                into_jsrpc_error(Web3Error::InternalError(anyhow::Error::msg(
-                    "Failed to acquire read lock for inner node state.",
-                )))
-            })?;
+        let inner = self.read_inner()?;
 
-            Ok(inner
-                .tx_results
-                .get(&tx_hash)
-                .map(|tx| tx.debug_info(only_top)))
-        })
+        Ok(inner
+            .tx_results
+            .get(&tx_hash)
+            .map(|tx| CallTracerResult::CallTrace(tx.debug_info(only_top))))
     }
 }
 
@@ -299,9 +220,10 @@ mod tests {
             .gas(80_000_000.into())
             .build();
         let trace = node
-            .trace_call(request.clone(), None, None)
+            .trace_call_impl(request.clone(), None, None)
             .await
-            .expect("trace call");
+            .expect("trace call")
+            .unwrap_default();
 
         // call should not revert
         assert!(trace.error.is_none());
@@ -351,7 +273,7 @@ mod tests {
 
         // if we trace with onlyTopCall=true, we should get only the top-level call
         let trace = node
-            .trace_call(
+            .trace_call_impl(
                 request,
                 None,
                 Some(TracerConfig {
@@ -362,7 +284,8 @@ mod tests {
                 }),
             )
             .await
-            .expect("trace call");
+            .expect("trace call")
+            .unwrap_default();
         // call should not revert
         assert!(trace.error.is_none());
         assert!(trace.revert_reason.is_none());
@@ -384,9 +307,10 @@ mod tests {
             .gas(80_000_000.into())
             .build();
         let trace = node
-            .trace_call(request, None, None)
+            .trace_call_impl(request, None, None)
             .await
-            .expect("trace call");
+            .expect("trace call")
+            .unwrap_default();
 
         // call should revert
         assert!(trace.revert_reason.is_some());
@@ -407,7 +331,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_trace_transaction() {
+    async fn test_trace_transaction_impl() {
         let node = InMemoryNode::default();
         let inner = node.get_inner();
         {
@@ -427,10 +351,11 @@ mod tests {
             );
         }
         let result = node
-            .trace_transaction(H256::repeat_byte(0x1), None)
+            .trace_transaction_impl(H256::repeat_byte(0x1), None)
             .await
             .unwrap()
-            .unwrap();
+            .unwrap()
+            .unwrap_default();
         assert_eq!(result.calls.len(), 1);
     }
 
@@ -455,7 +380,7 @@ mod tests {
             );
         }
         let result = node
-            .trace_transaction(
+            .trace_transaction_impl(
                 H256::repeat_byte(0x1),
                 Some(TracerConfig {
                     tracer: SupportedTracers::CallTracer,
@@ -466,7 +391,8 @@ mod tests {
             )
             .await
             .unwrap()
-            .unwrap();
+            .unwrap()
+            .unwrap_default();
         assert!(result.calls.is_empty());
     }
 
@@ -474,7 +400,7 @@ mod tests {
     async fn test_trace_transaction_not_found() {
         let node = InMemoryNode::default();
         let result = node
-            .trace_transaction(H256::repeat_byte(0x1), None)
+            .trace_transaction_impl(H256::repeat_byte(0x1), None)
             .await
             .unwrap();
         assert!(result.is_none());
@@ -490,14 +416,15 @@ mod tests {
             writer.blocks.insert(H256::repeat_byte(0x1), block);
         }
         let result = node
-            .trace_block_by_hash(H256::repeat_byte(0x1), None)
+            .trace_block_by_hash_impl(H256::repeat_byte(0x1), None)
             .await
-            .unwrap();
+            .unwrap()
+            .unwrap_default();
         assert_eq!(result.len(), 0);
     }
 
     #[tokio::test]
-    async fn test_trace_block_by_hash() {
+    async fn test_trace_block_by_hash_impl() {
         let node = InMemoryNode::default();
         let inner = node.get_inner();
         {
@@ -517,15 +444,16 @@ mod tests {
             );
         }
         let result = node
-            .trace_block_by_hash(H256::repeat_byte(0x1), None)
+            .trace_block_by_hash_impl(H256::repeat_byte(0x1), None)
             .await
-            .unwrap();
+            .unwrap()
+            .unwrap_default();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].result.calls.len(), 1);
     }
 
     #[tokio::test]
-    async fn test_trace_block_by_number() {
+    async fn test_trace_block_by_number_impl() {
         let node = InMemoryNode::default();
         let inner = node.get_inner();
         {
@@ -547,17 +475,19 @@ mod tests {
         }
         // check `latest` alias
         let result = node
-            .trace_block_by_number(BlockNumber::Latest, None)
+            .trace_block_by_number_impl(BlockNumber::Latest, None)
             .await
-            .unwrap();
+            .unwrap()
+            .unwrap_default();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].result.calls.len(), 1);
 
         // check block number
         let result = node
-            .trace_block_by_number(BlockNumber::Number(0.into()), None)
+            .trace_block_by_number_impl(BlockNumber::Number(0.into()), None)
             .await
-            .unwrap();
+            .unwrap()
+            .unwrap_default();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].result.calls.len(), 1);
     }

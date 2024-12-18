@@ -18,16 +18,16 @@ use crate::{
     },
     observability::Observability,
     system_contracts::SystemContracts,
-    utils::{bytecode_to_factory_dep, create_debug_output, into_jsrpc_error},
+    utils::{bytecode_to_factory_dep, create_debug_output},
 };
 use anvil_zksync_config::constants::{
-    LEGACY_RICH_WALLETS, NON_FORK_FIRST_BLOCK_TIMESTAMP, RICH_WALLETS,
+    LEGACY_RICH_WALLETS, NON_FORK_FIRST_BLOCK_TIMESTAMP, RICH_WALLETS, TEST_NODE_NETWORK_ID,
 };
-use anvil_zksync_config::types::{
-    CacheConfig, Genesis, ShowCalls, ShowGasDetails, ShowStorageLogs, ShowVMDetails,
-    SystemContractsOptions, TransactionOrder,
-};
+use anvil_zksync_config::types::{CacheConfig, Genesis, SystemContractsOptions};
 use anvil_zksync_config::TestNodeConfig;
+use anvil_zksync_types::{
+    LogLevel, ShowCalls, ShowGasDetails, ShowStorageLogs, ShowVMDetails, TransactionOrder,
+};
 use colored::Colorize;
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
@@ -64,6 +64,7 @@ use zksync_multivm::{
     },
     HistoryMode, VmVersion,
 };
+use zksync_types::transaction_request::CallRequest;
 use zksync_types::{
     api::{Block, DebugCall, Log, TransactionReceipt, TransactionVariant},
     block::{build_bloom, unpack_block_info, L2BlockHasher},
@@ -474,8 +475,8 @@ impl InMemoryNodeInner {
     pub fn estimate_gas_impl<T: ReadTime>(
         &self,
         time: &T,
-        req: zksync_types::transaction_request::CallRequest,
-    ) -> jsonrpc_core::Result<Fee> {
+        req: CallRequest,
+    ) -> Result<Fee, Web3Error> {
         let mut request_with_gas_per_pubdata_overridden = req;
 
         if let Some(ref mut eip712_meta) = request_with_gas_per_pubdata_overridden.eip712_meta {
@@ -503,7 +504,7 @@ impl InMemoryNodeInner {
             MAX_TX_SIZE,
             allow_no_target,
         )
-        .map_err(|err| into_jsrpc_error(Web3Error::SerializationError(err)))?;
+        .map_err(Web3Error::SerializationError)?;
 
         let tx: Transaction = l2_tx.clone().into();
 
@@ -574,10 +575,10 @@ impl InMemoryNodeInner {
             );
 
             if result.statistics.pubdata_published > MAX_VM_PUBDATA_PER_BATCH.try_into().unwrap() {
-                return Err(into_jsrpc_error(Web3Error::SubmitTransactionError(
+                return Err(Web3Error::SubmitTransactionError(
                     "exceeds limit for published pubdata".into(),
                     Default::default(),
-                )));
+                ));
             }
 
             // It is assumed that there is no overflow here
@@ -673,10 +674,7 @@ impl InMemoryNodeInner {
                 );
                 let data = output.encoded_data();
                 tracing::info!("{}", pretty_message.on_red());
-                Err(into_jsrpc_error(Web3Error::SubmitTransactionError(
-                    pretty_message,
-                    data,
-                )))
+                Err(Web3Error::SubmitTransactionError(pretty_message, data))
             }
             ExecutionResult::Halt { reason } => {
                 tracing::info!("{}", format!("Unable to estimate gas for the request with our suggested gas limit of {}. The transaction is most likely unexecutable. Breakdown of estimation:", suggested_gas_limit + overhead).red());
@@ -701,10 +699,7 @@ impl InMemoryNodeInner {
                 );
 
                 tracing::info!("{}", pretty_message.on_red());
-                Err(into_jsrpc_error(Web3Error::SubmitTransactionError(
-                    pretty_message,
-                    vec![],
-                )))
+                Err(Web3Error::SubmitTransactionError(pretty_message, vec![]))
             }
             ExecutionResult::Success { .. } => {
                 let full_gas_limit = match suggested_gas_limit.overflowing_add(overhead) {
@@ -724,10 +719,10 @@ impl InMemoryNodeInner {
                             format!("\tGas for pubdata: {}", additional_gas_for_pubdata).red()
                         );
                         tracing::info!("{}", format!("\tOverhead: {}", overhead).red());
-                        return Err(into_jsrpc_error(Web3Error::SubmitTransactionError(
+                        return Err(Web3Error::SubmitTransactionError(
                             "exceeds block gas limit".into(),
                             Default::default(),
-                        )));
+                        ));
                     }
                 };
 
@@ -1990,6 +1985,97 @@ impl InMemoryNode {
             .map_err(|_| anyhow::anyhow!("Failed to acquire write lock"))?
             .load_state(time, state)
     }
+
+    pub fn get_chain_id(&self) -> anyhow::Result<u32> {
+        Ok(self
+            .read_inner()?
+            .config
+            .chain_id
+            .unwrap_or(TEST_NODE_NETWORK_ID))
+    }
+
+    pub fn get_show_calls(&self) -> anyhow::Result<String> {
+        Ok(self.read_inner()?.config.show_calls.to_string())
+    }
+
+    pub fn get_show_outputs(&self) -> anyhow::Result<bool> {
+        Ok(self.read_inner()?.config.show_outputs)
+    }
+
+    pub fn get_current_timestamp(&self) -> anyhow::Result<u64> {
+        Ok(self.time.current_timestamp())
+    }
+
+    pub fn set_show_calls(&self, show_calls: ShowCalls) -> anyhow::Result<String> {
+        self.write_inner()?.config.show_calls = show_calls;
+        Ok(show_calls.to_string())
+    }
+
+    pub fn set_show_outputs(&self, value: bool) -> anyhow::Result<bool> {
+        self.write_inner()?.config.show_outputs = value;
+        Ok(value)
+    }
+
+    pub fn set_show_storage_logs(
+        &self,
+        show_storage_logs: ShowStorageLogs,
+    ) -> anyhow::Result<String> {
+        self.write_inner()?.config.show_storage_logs = show_storage_logs;
+        Ok(show_storage_logs.to_string())
+    }
+
+    pub fn set_show_vm_details(&self, show_vm_details: ShowVMDetails) -> anyhow::Result<String> {
+        self.write_inner()?.config.show_vm_details = show_vm_details;
+        Ok(show_vm_details.to_string())
+    }
+
+    pub fn set_show_gas_details(&self, show_gas_details: ShowGasDetails) -> anyhow::Result<String> {
+        self.write_inner()?.config.show_gas_details = show_gas_details;
+        Ok(show_gas_details.to_string())
+    }
+
+    pub fn set_resolve_hashes(&self, value: bool) -> anyhow::Result<bool> {
+        self.write_inner()?.config.resolve_hashes = value;
+        Ok(value)
+    }
+
+    pub fn set_show_node_config(&self, value: bool) -> anyhow::Result<bool> {
+        self.write_inner()?.config.show_node_config = value;
+        Ok(value)
+    }
+
+    pub fn set_show_tx_summary(&self, value: bool) -> anyhow::Result<bool> {
+        self.write_inner()?.config.show_tx_summary = value;
+        Ok(value)
+    }
+
+    pub fn set_show_event_logs(&self, value: bool) -> anyhow::Result<bool> {
+        self.write_inner()?.config.show_event_logs = value;
+        Ok(value)
+    }
+
+    pub fn set_disable_console_log(&self, value: bool) -> anyhow::Result<bool> {
+        self.write_inner()?.config.disable_console_log = value;
+        Ok(value)
+    }
+
+    pub fn set_log_level(&self, level: LogLevel) -> anyhow::Result<bool> {
+        let Some(observability) = &self.observability else {
+            anyhow::bail!("Node's logging is not set up.")
+        };
+        tracing::info!("setting log level to '{}'", level);
+        observability.set_log_level(level)?;
+        Ok(true)
+    }
+
+    pub fn set_logging(&self, directive: String) -> anyhow::Result<bool> {
+        let Some(observability) = &self.observability else {
+            anyhow::bail!("Node's logging is not set up.")
+        };
+        tracing::info!("setting logging to '{}'", directive);
+        observability.set_logging(directive)?;
+        Ok(true)
+    }
 }
 
 /// Keeps track of a block's batch number, miniblock number and timestamp.
@@ -2038,8 +2124,9 @@ mod tests {
         DEFAULT_ESTIMATE_GAS_SCALE_FACTOR, DEFAULT_FAIR_PUBDATA_PRICE, DEFAULT_L2_GAS_PRICE,
         TEST_NODE_NETWORK_ID,
     };
-    use anvil_zksync_config::types::{SystemContractsOptions, TransactionOrder};
+    use anvil_zksync_config::types::SystemContractsOptions;
     use anvil_zksync_config::TestNodeConfig;
+    use anvil_zksync_types::TransactionOrder;
     use ethabi::{Token, Uint};
     use zksync_types::{utils::deployed_address_create, K256PrivateKey, Nonce};
 

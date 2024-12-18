@@ -2,6 +2,9 @@ use crate::constants::*;
 use crate::types::*;
 use crate::utils::{format_eth, format_gwei};
 use alloy_signer_local::PrivateKeySigner;
+use anvil_zksync_types::{
+    LogLevel, ShowCalls, ShowGasDetails, ShowStorageLogs, ShowVMDetails, TransactionOrder,
+};
 use colored::{Colorize, CustomColor};
 use serde_json::{json, to_writer, Value};
 use std::collections::HashMap;
@@ -897,10 +900,8 @@ impl TestNodeConfig {
 
     // Enable or disable CORS
     #[must_use]
-    pub fn with_no_cors(mut self, no_cors: Option<bool>) -> Self {
-        if let Some(no_cors) = no_cors {
-            self.no_cors = no_cors;
-        }
+    pub fn with_no_cors(mut self, no_cors: bool) -> Self {
+        self.no_cors = no_cors;
         self
     }
 }

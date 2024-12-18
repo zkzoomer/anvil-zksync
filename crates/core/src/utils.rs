@@ -1,10 +1,6 @@
 use anyhow::Context;
 use chrono::{DateTime, Utc};
-use futures::Future;
-use jsonrpc_core::{Error, ErrorCode};
-use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
-use std::{convert::TryInto, fmt, pin::Pin};
+use std::{convert::TryInto, fmt};
 use zksync_multivm::interface::{Call, CallType, ExecutionResult, VmExecutionResultAndLogs};
 use zksync_types::{
     api::{BlockNumber, DebugCall, DebugCallType},
@@ -14,19 +10,6 @@ use zksync_types::{
 };
 use zksync_utils::bytes_to_be_words;
 use zksync_web3_decl::error::Web3Error;
-
-pub(crate) trait IntoBoxedFuture: Sized + Send + 'static {
-    fn into_boxed_future(self) -> Pin<Box<dyn Future<Output = Self> + Send>> {
-        Box::pin(async { self })
-    }
-}
-
-impl<T, U> IntoBoxedFuture for Result<T, U>
-where
-    T: Send + 'static,
-    U: Send + 'static,
-{
-}
 
 /// Takes long integers and returns them in human friendly format with "_".
 /// For example: 12_334_093
@@ -77,19 +60,6 @@ pub fn to_real_block_number(block_number: BlockNumber, latest_block_number: U64)
         BlockNumber::Earliest => U64::zero(),
         BlockNumber::Number(n) => n,
     }
-}
-
-/// Returns a [jsonrpc_core::Error] indicating that the method is not implemented.
-pub fn not_implemented<T: Send + 'static>(
-    method_name: &str,
-) -> jsonrpc_core::BoxFuture<Result<T, jsonrpc_core::Error>> {
-    tracing::warn!("Method {} is not implemented", method_name);
-    Err(jsonrpc_core::Error {
-        data: None,
-        code: jsonrpc_core::ErrorCode::MethodNotFound,
-        message: format!("Method {} is not implemented", method_name),
-    })
-    .into_boxed_future()
 }
 
 /// Creates a [DebugCall] from a [L2Tx], [VmExecutionResultAndLogs] and a list of [Call]s.
@@ -171,51 +141,6 @@ pub fn utc_datetime_from_epoch_ms(millis: u64) -> DateTime<Utc> {
     DateTime::<Utc>::from_timestamp(secs as i64, nanos as u32).expect("valid timestamp")
 }
 
-pub fn report_into_jsrpc_error(error: eyre::Report) -> Error {
-    into_jsrpc_error(Web3Error::InternalError(anyhow::Error::msg(
-        error.to_string(),
-    )))
-}
-
-pub fn into_jsrpc_error(err: Web3Error) -> Error {
-    Error {
-        code: match err {
-            Web3Error::InternalError(_) | Web3Error::MethodNotImplemented => {
-                ErrorCode::InternalError
-            }
-            Web3Error::NoBlock
-            | Web3Error::PrunedBlock(_)
-            | Web3Error::PrunedL1Batch(_)
-            | Web3Error::ProxyError(_)
-            | Web3Error::TooManyTopics
-            | Web3Error::FilterNotFound
-            | Web3Error::LogsLimitExceeded(_, _, _)
-            | Web3Error::InvalidFilterBlockHash
-            | Web3Error::TreeApiUnavailable => ErrorCode::InvalidParams,
-            Web3Error::SubmitTransactionError(_, _) | Web3Error::SerializationError(_) => {
-                ErrorCode::ServerError(3)
-            }
-        },
-        message: match &err {
-            Web3Error::SubmitTransactionError(_, _) => err.to_string(),
-            Web3Error::InternalError(err) => {
-                if let Some(TransparentError(message)) = err.downcast_ref() {
-                    message.clone()
-                } else {
-                    err.to_string()
-                }
-            }
-            _ => err.to_string(),
-        },
-        data: match err {
-            Web3Error::SubmitTransactionError(_, data) => {
-                Some(format!("0x{}", hex::encode(data)).into())
-            }
-            _ => None,
-        },
-    }
-}
-
 /// Error that can be converted to a [`Web3Error`] and has transparent JSON-RPC error message (unlike `anyhow::Error` conversions).
 #[derive(Debug)]
 pub(crate) struct TransparentError(pub String);
@@ -234,14 +159,6 @@ impl From<TransparentError> for Web3Error {
     }
 }
 
-pub fn into_jsrpc_error_message(msg: String) -> Error {
-    Error {
-        code: ErrorCode::InternalError,
-        message: msg,
-        data: None,
-    }
-}
-
 pub fn internal_error(method_name: &'static str, error: impl fmt::Display) -> Web3Error {
     tracing::error!("Internal error in method {method_name}: {error}");
     Web3Error::InternalError(anyhow::Error::msg(error.to_string()))
@@ -257,38 +174,6 @@ pub fn internal_error(method_name: &'static str, error: impl fmt::Display) -> We
 pub fn h256_to_u64(value: H256) -> u64 {
     let be_u64_bytes: [u8; 8] = value[24..].try_into().unwrap();
     u64::from_be_bytes(be_u64_bytes)
-}
-
-/// Helper type to be able to parse both `u64` and `U256` depending on the user input
-#[derive(Copy, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum Numeric {
-    /// A [U256] value.
-    U256(U256),
-    /// A `u64` value.
-    Num(u64),
-}
-
-impl From<u64> for Numeric {
-    fn from(value: u64) -> Self {
-        Numeric::Num(value)
-    }
-}
-
-impl TryFrom<Numeric> for u64 {
-    type Error = anyhow::Error;
-
-    fn try_from(value: Numeric) -> Result<Self, Self::Error> {
-        match value {
-            Numeric::U256(n) => {
-                if n >= U256::from(u64::MAX) {
-                    return Err(anyhow::anyhow!("Number is too big"));
-                }
-                Ok(n.as_u64())
-            }
-            Numeric::Num(n) => Ok(n),
-        }
-    }
 }
 
 /// Calculates the cost of a transaction in ETH.
