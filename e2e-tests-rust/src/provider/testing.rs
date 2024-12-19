@@ -20,7 +20,7 @@ use alloy_zksync::network::receipt_response::ReceiptResponse;
 use alloy_zksync::network::transaction_response::TransactionResponse;
 use alloy_zksync::network::Zksync;
 use alloy_zksync::node_bindings::{AnvilZKsync, AnvilZKsyncError::NoKeysAvailable};
-use alloy_zksync::provider::{zksync_provider, layers::anvil_zksync::AnvilZKsyncLayer};
+use alloy_zksync::provider::{layers::anvil_zksync::AnvilZKsyncLayer, zksync_provider};
 use alloy_zksync::wallet::ZksyncWallet;
 use anyhow::Context as _;
 use async_trait::async_trait;
@@ -105,7 +105,7 @@ pub async fn init_testing_provider_with_client(
     let http = HttpWithMiddleware::with_client(client, url.clone());
     let rpc_client = RpcClient::new(http, true);
 
-    let rich_accounts = node_layer.instance().addresses().iter().cloned().collect();
+    let rich_accounts = node_layer.instance().addresses().to_vec();
     let default_keys = node_layer.instance().keys().to_vec();
     let (default_key, remaining_keys) = default_keys.split_first().ok_or(NoKeysAvailable)?;
 

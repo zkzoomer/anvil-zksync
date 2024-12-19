@@ -2,13 +2,11 @@ use alloy::network::ReceiptResponse;
 use alloy::providers::ext::AnvilApi;
 use alloy::providers::Provider;
 use alloy::{
-    network::primitives::BlockTransactionsKind,
-    primitives::U256,
-    signers::local::PrivateKeySigner,
+    network::primitives::BlockTransactionsKind, primitives::U256, signers::local::PrivateKeySigner,
 };
 use anvil_zksync_e2e_tests::{
-    init_testing_provider, init_testing_provider_with_client, AnvilZKsyncApi, ReceiptExt,
-    ZksyncWalletProviderExt, DEFAULT_TX_VALUE, get_node_binary_path
+    get_node_binary_path, init_testing_provider, init_testing_provider_with_client, AnvilZKsyncApi,
+    ReceiptExt, ZksyncWalletProviderExt, DEFAULT_TX_VALUE,
 };
 use http::header::{
     HeaderMap, HeaderValue, ACCESS_CONTROL_ALLOW_HEADERS, ACCESS_CONTROL_ALLOW_METHODS,
@@ -20,7 +18,7 @@ const OTHER_ORIGIN: HeaderValue = HeaderValue::from_static("http://other.origin"
 const ANY_ORIGIN: HeaderValue = HeaderValue::from_static("*");
 
 use anvil_zksync_core::node::VersionedState;
-use std::{ fs, convert::identity, thread::sleep, time::Duration };
+use std::{convert::identity, fs, thread::sleep, time::Duration};
 use tempdir::TempDir;
 
 #[tokio::test]
@@ -75,11 +73,11 @@ async fn no_sealing_timeout() -> anyhow::Result<()> {
 async fn dynamic_sealing_mode() -> anyhow::Result<()> {
     // Test that we can successfully switch between different sealing modes
     let provider = init_testing_provider(|node| node.no_mine()).await?;
-    assert_eq!(provider.anvil_get_auto_mine().await?, false);
+    assert!(!(provider.anvil_get_auto_mine().await?));
 
     // Enable immediate block sealing
     provider.anvil_set_auto_mine(true).await?;
-    assert_eq!(provider.anvil_get_auto_mine().await?, true);
+    assert!(provider.anvil_get_auto_mine().await?);
 
     // Check that we can finalize transactions now
     let receipt = provider.tx().finalize().await?;
@@ -87,7 +85,7 @@ async fn dynamic_sealing_mode() -> anyhow::Result<()> {
 
     // Enable interval block sealing
     provider.anvil_set_interval_mining(3).await?;
-    assert_eq!(provider.anvil_get_auto_mine().await?, false);
+    assert!(!(provider.anvil_get_auto_mine().await?));
 
     // Check that we can finalize two txs in the same block now
     provider
@@ -98,7 +96,7 @@ async fn dynamic_sealing_mode() -> anyhow::Result<()> {
 
     // Disable block sealing entirely
     provider.anvil_set_auto_mine(false).await?;
-    assert_eq!(provider.anvil_get_auto_mine().await?, false);
+    assert!(!(provider.anvil_get_auto_mine().await?));
 
     // Check that transactions do not get finalized now
     provider
@@ -467,13 +465,31 @@ async fn cli_allow_origin() -> anyhow::Result<()> {
 async fn pool_txs_order_fifo() -> anyhow::Result<()> {
     let provider_fifo = init_testing_provider(|node| node.no_mine()).await?;
 
-    let pending_tx0 = provider_fifo.tx().with_rich_from(0).with_max_fee_per_gas(50_000_000).register().await?;
-    let pending_tx1 = provider_fifo.tx().with_rich_from(1).with_max_fee_per_gas(100_000_000).register().await?;
-    let pending_tx2 = provider_fifo.tx().with_rich_from(2).with_max_fee_per_gas(150_000_000).register().await?;
+    let pending_tx0 = provider_fifo
+        .tx()
+        .with_rich_from(0)
+        .with_max_fee_per_gas(50_000_000)
+        .register()
+        .await?;
+    let pending_tx1 = provider_fifo
+        .tx()
+        .with_rich_from(1)
+        .with_max_fee_per_gas(100_000_000)
+        .register()
+        .await?;
+    let pending_tx2 = provider_fifo
+        .tx()
+        .with_rich_from(2)
+        .with_max_fee_per_gas(150_000_000)
+        .register()
+        .await?;
 
     provider_fifo.anvil_mine(Some(U256::from(1)), None).await?;
 
-    let block = provider_fifo.get_block(1.into(), BlockTransactionsKind::Hashes).await?.unwrap();
+    let block = provider_fifo
+        .get_block(1.into(), BlockTransactionsKind::Hashes)
+        .await?
+        .unwrap();
     let tx_hashes = block.transactions.as_hashes().unwrap();
     assert_eq!(&tx_hashes[0], pending_tx0.tx_hash());
     assert_eq!(&tx_hashes[1], pending_tx1.tx_hash());
@@ -485,13 +501,31 @@ async fn pool_txs_order_fifo() -> anyhow::Result<()> {
 async fn pool_txs_order_fees() -> anyhow::Result<()> {
     let provider_fees = init_testing_provider(|node| node.no_mine().arg("--order=fees")).await?;
 
-    let pending_tx0 = provider_fees.tx().with_rich_from(0).with_max_fee_per_gas(50_000_000).register().await?;
-    let pending_tx1 = provider_fees.tx().with_rich_from(1).with_max_fee_per_gas(100_000_000).register().await?;
-    let pending_tx2 = provider_fees.tx().with_rich_from(2).with_max_fee_per_gas(150_000_000).register().await?;
+    let pending_tx0 = provider_fees
+        .tx()
+        .with_rich_from(0)
+        .with_max_fee_per_gas(50_000_000)
+        .register()
+        .await?;
+    let pending_tx1 = provider_fees
+        .tx()
+        .with_rich_from(1)
+        .with_max_fee_per_gas(100_000_000)
+        .register()
+        .await?;
+    let pending_tx2 = provider_fees
+        .tx()
+        .with_rich_from(2)
+        .with_max_fee_per_gas(150_000_000)
+        .register()
+        .await?;
 
     provider_fees.anvil_mine(Some(U256::from(1)), None).await?;
 
-    let block = provider_fees.get_block(1.into(), BlockTransactionsKind::Hashes).await?.unwrap();
+    let block = provider_fees
+        .get_block(1.into(), BlockTransactionsKind::Hashes)
+        .await?
+        .unwrap();
     let tx_hashes = block.transactions.as_hashes().unwrap();
     assert_eq!(&tx_hashes[0], pending_tx2.tx_hash());
     assert_eq!(&tx_hashes[1], pending_tx1.tx_hash());
@@ -516,14 +550,13 @@ async fn transactions_have_index() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn dump_state_on_run() -> anyhow::Result<()>  {
+async fn dump_state_on_run() -> anyhow::Result<()> {
     let temp_dir = TempDir::new("state-test").expect("failed creating temporary dir");
     let dump_path = temp_dir.path().join("state_dump.json");
 
     let dump_path_clone = dump_path.clone();
-     let provider = init_testing_provider(move |node| {
-        node
-            .path(get_node_binary_path())
+    let provider = init_testing_provider(move |node| {
+        node.path(get_node_binary_path())
             .arg("--state-interval")
             .arg("1")
             .arg("--dump-state")
@@ -543,11 +576,11 @@ async fn dump_state_on_run() -> anyhow::Result<()>  {
         "State dump file should exist at {:?}",
         dump_path
     );
-    
+
     let dumped_data = fs::read_to_string(&dump_path)?;
     let state: VersionedState = serde_json::from_str(&dumped_data)
         .map_err(|e| anyhow::anyhow!("Failed to deserialize state: {}", e))?;
-    
+
     match state {
         VersionedState::V1 { version: _, state } => {
             assert!(
@@ -558,7 +591,7 @@ async fn dump_state_on_run() -> anyhow::Result<()>  {
                 !state.transactions.is_empty(),
                 "state_dump.json should contain at least one transaction"
             );
-        },
+        }
         VersionedState::Unknown { version } => {
             panic!("Encountered unknown state version: {}", version);
         }
@@ -568,14 +601,13 @@ async fn dump_state_on_run() -> anyhow::Result<()>  {
 }
 
 #[tokio::test]
-async fn dump_state_on_fork() -> anyhow::Result<()>  {
+async fn dump_state_on_fork() -> anyhow::Result<()> {
     let temp_dir = TempDir::new("state-fork-test").expect("failed creating temporary dir");
     let dump_path = temp_dir.path().join("state_dump_fork.json");
 
     let dump_path_clone = dump_path.clone();
     let provider = init_testing_provider(move |node| {
-        node
-            .path(get_node_binary_path())
+        node.path(get_node_binary_path())
             .arg("--state-interval")
             .arg("1")
             .arg("--dump-state")
@@ -596,11 +628,11 @@ async fn dump_state_on_fork() -> anyhow::Result<()>  {
         "State dump file should exist at {:?}",
         dump_path
     );
-    
+
     let dumped_data = fs::read_to_string(&dump_path)?;
     let state: VersionedState = serde_json::from_str(&dumped_data)
         .map_err(|e| anyhow::anyhow!("Failed to deserialize state: {}", e))?;
-    
+
     match state {
         VersionedState::V1 { version: _, state } => {
             assert!(
@@ -611,7 +643,7 @@ async fn dump_state_on_fork() -> anyhow::Result<()>  {
                 !state.transactions.is_empty(),
                 "state_dump_fork.json should contain at least one transaction"
             );
-        },
+        }
         VersionedState::Unknown { version } => {
             panic!("Encountered unknown state version: {}", version);
         }
