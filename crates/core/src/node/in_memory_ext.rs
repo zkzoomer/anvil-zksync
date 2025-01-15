@@ -2,17 +2,14 @@ use super::inner::fork::ForkDetails;
 use super::pool::TxBatch;
 use super::sealer::BlockSealerMode;
 use super::InMemoryNode;
+use crate::node::keys::StorageKeyLayout;
 use crate::utils::bytecode_to_factory_dep;
 use anvil_zksync_types::api::{DetailedTransaction, ResetRequest};
 use anyhow::anyhow;
 use std::time::Duration;
 use zksync_types::api::{Block, TransactionVariant};
 use zksync_types::u256_to_h256;
-use zksync_types::{
-    get_code_key, get_nonce_key,
-    utils::{nonces_to_full_nonce, storage_key_for_eth_balance},
-    L2BlockNumber, StorageKey,
-};
+use zksync_types::{get_code_key, utils::nonces_to_full_nonce, L2BlockNumber, StorageKey};
 use zksync_types::{AccountTreeId, Address, H256, U256, U64};
 
 type Result<T> = anyhow::Result<T>;
@@ -170,7 +167,10 @@ impl InMemoryNode {
 
     pub async fn set_balance(&self, address: Address, balance: U256) -> bool {
         let writer = self.inner.write().await;
-        let balance_key = storage_key_for_eth_balance(&address);
+        let balance_key = StorageKeyLayout::get_storage_key_for_base_token(
+            self.system_contracts.use_zkos,
+            &address,
+        );
         writer
             .fork_storage
             .set_value(balance_key, u256_to_h256(balance));
@@ -184,7 +184,7 @@ impl InMemoryNode {
 
     pub async fn set_nonce(&self, address: Address, nonce: U256) -> bool {
         let writer = self.inner.write().await;
-        let nonce_key = get_nonce_key(&address);
+        let nonce_key = StorageKeyLayout::get_nonce_key(self.system_contracts.use_zkos, &address);
         let enforced_full_nonce = nonces_to_full_nonce(nonce, nonce);
         tracing::info!(
             "👷 Nonces for address {:?} have been set to {}",
@@ -323,17 +323,7 @@ impl InMemoryNode {
             .strip_prefix("0x")
             .ok_or_else(|| anyhow!("code must be 0x-prefixed"))?;
         let code_bytes = hex::decode(code_slice)?;
-        let hashcode = bytecode_to_factory_dep(code_bytes)?;
-        let hash = u256_to_h256(hashcode.0);
-        let code = hashcode
-            .1
-            .iter()
-            .flat_map(|entry| {
-                let mut bytes = vec![0u8; 32];
-                entry.to_big_endian(&mut bytes);
-                bytes.to_vec()
-            })
-            .collect();
+        let (hash, code) = bytecode_to_factory_dep(code_bytes)?;
         writer.fork_storage.store_factory_dep(hash, code);
         writer.fork_storage.set_value(code_key, hash);
         Ok(())
