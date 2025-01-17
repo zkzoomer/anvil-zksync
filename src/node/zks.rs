@@ -47,7 +47,7 @@ impl<S: ForkSource + std::fmt::Debug + Clone + Send + Sync + 'static> ZksNamespa
                     "Failed to acquire read lock for inner node state.",
                 )))
             })
-            .and_then(|reader| reader.estimate_gas_impl(req))
+            .and_then(|reader| reader.estimate_gas_impl(&self.time, req))
             .into_boxed_future()
     }
 
@@ -359,6 +359,7 @@ impl<S: ForkSource + std::fmt::Debug + Clone + Send + Sync + 'static> ZksNamespa
         block_number: zksync_types::L2BlockNumber,
     ) -> RpcResult<Option<zksync_types::api::BlockDetails>> {
         let inner = self.get_inner().clone();
+        let base_system_contracts_hashes = self.system_contracts.base_system_contracts_hashes();
         Box::pin(async move {
             let reader = inner.read().map_err(|_e| {
                 let error_message = "Failed to acquire lock. Please ensure the lock is not being held by another process or thread.".to_string();
@@ -390,12 +391,9 @@ impl<S: ForkSource + std::fmt::Debug + Clone + Send + Sync + 'static> ZksNamespa
                         executed_at: None,
                         execute_chain_id: None,
                         l1_gas_price: 0,
-                        l2_fair_gas_price: reader.fee_input_provider.l2_gas_price,
-                        fair_pubdata_price: Some(reader.fee_input_provider.l1_pubdata_price),
-                        base_system_contracts_hashes: reader
-                            .system_contracts
-                            .baseline_contracts
-                            .hashes(),
+                        l2_fair_gas_price: reader.fee_input_provider.gas_price(),
+                        fair_pubdata_price: Some(reader.fee_input_provider.fair_pubdata_price()),
+                        base_system_contracts_hashes,
                     },
                     operator_address: Address::zero(),
                     protocol_version: Some(ProtocolVersionId::latest()),
@@ -628,10 +626,10 @@ mod tests {
 
         let result = node.estimate_fee(mock_request).await.unwrap();
 
-        assert_eq!(result.gas_limit, U256::from(279779));
+        assert_eq!(result.gas_limit, U256::from(409123));
         assert_eq!(result.max_fee_per_gas, U256::from(45250000));
         assert_eq!(result.max_priority_fee_per_gas, U256::from(0));
-        assert_eq!(result.gas_per_pubdata_limit, U256::from(1658));
+        assert_eq!(result.gas_per_pubdata_limit, U256::from(3143));
     }
 
     #[tokio::test]
@@ -745,15 +743,11 @@ mod tests {
             }),
         );
 
-        let node = InMemoryNode::<HttpForkSource>::new(
-            Some(
-                ForkDetails::from_network(&mock_server.url(), None, &CacheConfig::None)
-                    .await
-                    .unwrap(),
-            ),
-            None,
-            &Default::default(),
-        );
+        let node = InMemoryNode::<HttpForkSource>::default_fork(Some(
+            ForkDetails::from_network(&mock_server.url(), None, &CacheConfig::None)
+                .await
+                .unwrap(),
+        ));
 
         let result = node
             .get_transaction_details(input_tx_hash)
@@ -835,15 +829,11 @@ mod tests {
               }),
         );
 
-        let node = InMemoryNode::<HttpForkSource>::new(
-            Some(
-                ForkDetails::from_network(&mock_server.url(), None, &CacheConfig::None)
-                    .await
-                    .unwrap(),
-            ),
-            None,
-            &Default::default(),
-        );
+        let node = InMemoryNode::<HttpForkSource>::default_fork(Some(
+            ForkDetails::from_network(&mock_server.url(), None, &CacheConfig::None)
+                .await
+                .unwrap(),
+        ));
 
         let result = node
             .get_block_details(miniblock)
@@ -917,15 +907,11 @@ mod tests {
             }),
         );
 
-        let node = InMemoryNode::<HttpForkSource>::new(
-            Some(
-                ForkDetails::from_network(&mock_server.url(), None, &CacheConfig::None)
-                    .await
-                    .unwrap(),
-            ),
-            None,
-            &Default::default(),
-        );
+        let node = InMemoryNode::<HttpForkSource>::default_fork(Some(
+            ForkDetails::from_network(&mock_server.url(), None, &CacheConfig::None)
+                .await
+                .unwrap(),
+        ));
 
         let actual_bridge_addresses = node
             .get_bridge_contracts()
@@ -984,15 +970,11 @@ mod tests {
             }),
         );
 
-        let node = InMemoryNode::<HttpForkSource>::new(
-            Some(
-                ForkDetails::from_network(&mock_server.url(), None, &CacheConfig::None)
-                    .await
-                    .unwrap(),
-            ),
-            None,
-            &Default::default(),
-        );
+        let node = InMemoryNode::<HttpForkSource>::default_fork(Some(
+            ForkDetails::from_network(&mock_server.url(), None, &CacheConfig::None)
+                .await
+                .unwrap(),
+        ));
 
         let actual = node
             .get_bytecode_by_hash(input_hash)
@@ -1109,15 +1091,11 @@ mod tests {
               }),
         );
 
-        let node = InMemoryNode::<HttpForkSource>::new(
-            Some(
-                ForkDetails::from_network(&mock_server.url(), None, &CacheConfig::None)
-                    .await
-                    .unwrap(),
-            ),
-            None,
-            &Default::default(),
-        );
+        let node = InMemoryNode::<HttpForkSource>::default_fork(Some(
+            ForkDetails::from_network(&mock_server.url(), None, &CacheConfig::None)
+                .await
+                .unwrap(),
+        ));
 
         let txns = node
             .get_raw_block_transactions(miniblock)
@@ -1292,15 +1270,11 @@ mod tests {
             }),
         );
 
-        let node = InMemoryNode::<HttpForkSource>::new(
-            Some(
-                ForkDetails::from_network(&mock_server.url(), Some(1), &CacheConfig::None)
-                    .await
-                    .unwrap(),
-            ),
-            None,
-            &Default::default(),
-        );
+        let node = InMemoryNode::<HttpForkSource>::default_fork(Some(
+            ForkDetails::from_network(&mock_server.url(), Some(1), &CacheConfig::None)
+                .await
+                .unwrap(),
+        ));
 
         {
             let inner = node.get_inner();

@@ -144,6 +144,8 @@ impl<S: ForkSource + std::fmt::Debug + Clone + Send + Sync + 'static> DebugNames
     ) -> RpcResult<DebugCall> {
         let only_top = options.is_some_and(|o| o.tracer_config.only_top_call);
         let inner = self.get_inner().clone();
+        let time = self.time.clone();
+        let system_contracts = self.system_contracts.contracts_for_l2_call().clone();
         Box::pin(async move {
             if block.is_some() && !matches!(block, Some(BlockId::Number(BlockNumber::Latest))) {
                 return Err(jsonrpc_core::Error::invalid_params(
@@ -157,7 +159,6 @@ impl<S: ForkSource + std::fmt::Debug + Clone + Send + Sync + 'static> DebugNames
                 )))
             })?;
 
-            let system_contracts = inner.system_contracts.contracts_for_l2_call();
             let allow_no_target = system_contracts.evm_emulator.is_some();
             let mut l2_tx = L2Tx::from_request(request.into(), MAX_TX_SIZE, allow_no_target)
                 .map_err(|err| into_jsrpc_error(Web3Error::SerializationError(err)))?;
@@ -165,7 +166,8 @@ impl<S: ForkSource + std::fmt::Debug + Clone + Send + Sync + 'static> DebugNames
             let storage = StorageView::new(&inner.fork_storage).into_rc_ptr();
 
             // init vm
-            let (mut l1_batch_env, _block_context) = inner.create_l1_batch_env(storage.clone());
+            let (mut l1_batch_env, _block_context) =
+                inner.create_l1_batch_env(&time, storage.clone());
 
             // update the enforced_base_fee within l1_batch_env to match the logic in zksync_core
             l1_batch_env.enforced_base_fee = Some(l2_tx.common_data.fee.max_fee_per_gas.as_u64());
@@ -243,6 +245,7 @@ mod tests {
 
     use super::*;
     use crate::{
+        config::constants::DEFAULT_ACCOUNT_BALANCE,
         deps::system_contracts::bytecode_from_slice,
         http_fork_source::HttpForkSource,
         node::{InMemoryNode, TransactionResult},
@@ -252,7 +255,7 @@ mod tests {
     fn deploy_test_contracts(node: &InMemoryNode<HttpForkSource>) -> (Address, Address) {
         let private_key = K256PrivateKey::from_bytes(H256::repeat_byte(0xee)).unwrap();
         let from_account = private_key.address();
-        node.set_rich_account(from_account);
+        node.set_rich_account(from_account, U256::from(DEFAULT_ACCOUNT_BALANCE));
 
         // first, deploy secondary contract
         let secondary_bytecode = bytecode_from_slice(

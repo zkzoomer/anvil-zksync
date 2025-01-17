@@ -19,7 +19,6 @@ use httptest::{
 };
 use itertools::Itertools;
 use std::str::FromStr;
-use zksync_multivm::interface::{ExecutionResult, VmExecutionResultAndLogs};
 use zksync_types::api::{
     BlockDetailsBase, BlockIdVariant, BlockStatus, BridgeAddresses, DebugCall, DebugCallType, Log,
 };
@@ -483,12 +482,15 @@ pub fn apply_tx<T: ForkSource + std::fmt::Debug + Clone>(
         .read()
         .map(|reader| reader.current_miniblock.saturating_add(1))
         .expect("failed getting current batch number");
-    let produced_block_hash = compute_hash(next_miniblock, tx_hash);
+    let produced_block_hash = compute_hash(next_miniblock, [&tx_hash]);
 
     let tx = TransactionBuilder::new().set_hash(tx_hash).build();
 
-    node.set_rich_account(tx.common_data.initiator_address);
-    node.apply_txs(vec![tx.clone()])
+    node.set_rich_account(
+        tx.common_data.initiator_address,
+        U256::from(100u128 * 10u128.pow(18)),
+    );
+    node.apply_txs(vec![tx.clone()], 1)
         .expect("failed applying tx");
 
     (produced_block_hash, U64::from(next_miniblock), tx)
@@ -512,7 +514,7 @@ pub fn deploy_contract<T: ForkSource + std::fmt::Debug + Clone>(
         .read()
         .map(|reader| reader.current_miniblock.saturating_add(1))
         .expect("failed getting current batch number");
-    let produced_block_hash = compute_hash(next_miniblock, tx_hash);
+    let produced_block_hash = compute_hash(next_miniblock, [&tx_hash]);
 
     let salt = [0u8; 32];
     let bytecode_hash = eip712::hash_bytecode(&bytecode).expect("invalid bytecode");
@@ -571,7 +573,8 @@ pub fn deploy_contract<T: ForkSource + std::fmt::Debug + Clone>(
     )
     .expect("failed signing tx");
     tx.set_input(vec![], tx_hash);
-    node.apply_txs(vec![tx]).expect("failed deploying contract");
+    node.apply_txs(vec![tx], 1)
+        .expect("failed deploying contract");
 
     produced_block_hash
 }
@@ -665,13 +668,6 @@ pub fn default_tx_execution_info() -> TxExecutionInfo {
         },
         batch_number: Default::default(),
         miniblock_number: Default::default(),
-        result: VmExecutionResultAndLogs {
-            result: ExecutionResult::Success { output: vec![] },
-            logs: Default::default(),
-            statistics: Default::default(),
-            refunds: Default::default(),
-            new_known_factory_deps: None,
-        },
     }
 }
 

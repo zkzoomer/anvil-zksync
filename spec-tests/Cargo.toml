@@ -1,9 +1,9 @@
 [package]
-name = "era_test_node_spec_tests"
+name = "anvil-zksync_spec_tests"
 edition = "2021"
 authors = ["The Matter Labs Team <hello@matterlabs.dev>"]
 homepage = "https://zksync.io/"
-repository = "https://github.com/matter-labs/era-test-node"
+repository = "https://github.com/matter-labs/anvil-zksync"
 license = "MIT OR Apache-2.0"
 keywords = ["blockchain", "zksync"]
 categories = ["cryptography"]
@@ -24,7 +24,7 @@ itertools = "0.13"
 tracing = "0.1"
 chrono = "0.4"
 
-zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "ad5d42e0c7b50068ff0fd501c2b2ee549410adf8" }
+zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "6c034f6e180cc92e99766f14c8840c90efa56cec" }
 
 [dev-dependencies]
 test-log = "0.2.16"

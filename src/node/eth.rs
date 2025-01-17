@@ -4,7 +4,7 @@ use anyhow::Context as _;
 use colored::Colorize;
 use futures::FutureExt;
 use itertools::Itertools;
-use zksync_multivm::interface::ExecutionResult;
+use zksync_multivm::interface::{ExecutionResult, TxExecutionMode};
 use zksync_multivm::vm_latest::constants::ETH_CALL_GAS_LIMIT;
 use zksync_types::{
     api::{Block, BlockIdVariant, BlockNumber, TransactionVariant},
@@ -41,7 +41,7 @@ impl<S: ForkSource + std::fmt::Debug + Clone + Send + Sync + 'static> InMemoryNo
         &self,
         req: zksync_types::transaction_request::CallRequest,
     ) -> Result<Bytes, Web3Error> {
-        let system_contracts = self.system_contracts_for_l2_call()?;
+        let system_contracts = self.system_contracts.contracts_for_l2_call().clone();
         let allow_no_target = system_contracts.evm_emulator.is_some();
 
         let mut tx = L2Tx::from_request(req.into(), MAX_TX_SIZE, allow_no_target)?;
@@ -89,7 +89,11 @@ impl<S: ForkSource + std::fmt::Debug + Clone + Send + Sync + 'static> InMemoryNo
             .chain_id;
 
         let (tx_req, hash) = TransactionRequest::from_bytes(&tx_bytes.0, chain_id)?;
-        let system_contracts = self.system_contracts_for_tx(tx_req.from.unwrap_or_default())?;
+        // Impersonation does not matter in this context so we assume the tx is not impersonated:
+        // system contracts here are fetched solely to check for EVM emulator.
+        let system_contracts = self
+            .system_contracts
+            .contracts(TxExecutionMode::VerifyExecute, false);
         let allow_no_target = system_contracts.evm_emulator.is_some();
         let mut l2_tx = L2Tx::from_request(tx_req, MAX_TX_SIZE, allow_no_target)?;
 
@@ -101,12 +105,7 @@ impl<S: ForkSource + std::fmt::Debug + Clone + Send + Sync + 'static> InMemoryNo
             return Err(err.into());
         };
 
-        self.run_l2_tx(l2_tx, system_contracts).map_err(|err| {
-            Web3Error::SubmitTransactionError(
-                format!("Execution error: {err}"),
-                hash.as_bytes().to_vec(),
-            )
-        })?;
+        self.pool.add_tx(l2_tx);
         Ok(hash)
     }
 
@@ -114,14 +113,14 @@ impl<S: ForkSource + std::fmt::Debug + Clone + Send + Sync + 'static> InMemoryNo
         &self,
         tx: zksync_types::transaction_request::CallRequest,
     ) -> Result<H256, Web3Error> {
-        let (chain_id, l1_gas_price) = {
+        let (chain_id, l2_gas_price) = {
             let reader = self
                 .inner
                 .read()
                 .map_err(|_| anyhow::anyhow!("Failed to acquire read lock"))?;
             (
                 reader.fork_storage.chain_id,
-                reader.fee_input_provider.l1_gas_price,
+                reader.fee_input_provider.gas_price(),
             )
         };
 
@@ -141,7 +140,7 @@ impl<S: ForkSource + std::fmt::Debug + Clone + Send + Sync + 'static> InMemoryNo
                 return Err(TransparentError(err.into()).into());
             }
         } else {
-            tx_req.gas_price = tx.max_fee_per_gas.unwrap_or(U256::from(l1_gas_price));
+            tx_req.gas_price = tx.max_fee_per_gas.unwrap_or(U256::from(l2_gas_price));
             tx_req.max_priority_fee_per_gas = tx.max_priority_fee_per_gas;
             if tx_req.transaction_type.is_none() {
                 tx_req.transaction_type = Some(zksync_types::EIP_1559_TX_TYPE.into());
@@ -159,7 +158,11 @@ impl<S: ForkSource + std::fmt::Debug + Clone + Send + Sync + 'static> InMemoryNo
             27,
         ))?;
 
-        let system_contracts = self.system_contracts_for_tx(tx_req.from.unwrap_or_default())?;
+        // Impersonation does not matter in this context so we assume the tx is not impersonated:
+        // system contracts here are fetched solely to check for EVM emulator.
+        let system_contracts = self
+            .system_contracts
+            .contracts(TxExecutionMode::VerifyExecute, false);
         let allow_no_target = system_contracts.evm_emulator.is_some();
         let mut l2_tx: L2Tx = L2Tx::from_request(tx_req, MAX_TX_SIZE, allow_no_target)?;
 
@@ -170,30 +173,19 @@ impl<S: ForkSource + std::fmt::Debug + Clone + Send + Sync + 'static> InMemoryNo
 
         l2_tx.set_input(bytes, hash);
 
+        if !self
+            .impersonation
+            .is_impersonating(&l2_tx.common_data.initiator_address)
         {
-            let reader = self
-                .inner
-                .read()
-                .map_err(|_| anyhow::anyhow!("Failed to acquire read lock for accounts."))?;
-            if !reader
-                .impersonated_accounts
-                .contains(&l2_tx.common_data.initiator_address)
-            {
-                let err = format!(
-                    "Initiator address {:?} is not allowed to perform transactions",
-                    l2_tx.common_data.initiator_address
-                );
-                tracing::error!("{err}");
-                return Err(TransparentError(err).into());
-            }
+            let err = format!(
+                "Initiator address {:?} is not allowed to perform transactions",
+                l2_tx.common_data.initiator_address
+            );
+            tracing::error!("{err}");
+            return Err(TransparentError(err).into());
         }
 
-        self.run_l2_tx(l2_tx, system_contracts).map_err(|err| {
-            Web3Error::SubmitTransactionError(
-                format!("Execution error: {err}"),
-                hash.as_bytes().to_vec(),
-            )
-        })?;
+        self.pool.add_tx(l2_tx);
         Ok(hash)
     }
 }
@@ -679,7 +671,7 @@ impl<S: ForkSource + std::fmt::Debug + Clone + Send + Sync + 'static> EthNamespa
             }
         };
 
-        let result: jsonrpc_core::Result<Fee> = reader.estimate_gas_impl(req);
+        let result: jsonrpc_core::Result<Fee> = reader.estimate_gas_impl(&self.time, req);
         match result {
             Ok(fee) => Ok(fee.gas_limit).into_boxed_future(),
             Err(err) => return futures::future::err(err).boxed(),
@@ -693,7 +685,7 @@ impl<S: ForkSource + std::fmt::Debug + Clone + Send + Sync + 'static> EthNamespa
             .read()
             .expect("Failed to acquire read lock")
             .fee_input_provider
-            .l2_gas_price;
+            .gas_price();
         Ok(U256::from(fair_l2_gas_price)).into_boxed_future()
     }
 
@@ -1419,7 +1411,7 @@ impl<S: ForkSource + std::fmt::Debug + Clone + Send + Sync + 'static> EthNamespa
                 .clamp(1, reader.current_miniblock + 1);
 
             let mut base_fee_per_gas =
-                vec![U256::from(reader.fee_input_provider.l2_gas_price); block_count as usize];
+                vec![U256::from(reader.fee_input_provider.gas_price()); block_count as usize];
 
             let oldest_block = reader.current_miniblock + 1 - base_fee_per_gas.len() as u64;
             // We do not store gas used ratio for blocks, returns array of zeroes as a placeholder.
@@ -1470,9 +1462,13 @@ impl<S: ForkSource + std::fmt::Debug + Clone + Send + Sync + 'static> EthTestNod
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::node::NON_FORK_FIRST_BLOCK_TIMESTAMP;
     use crate::{
-        config::{cache::CacheConfig, constants::DEFAULT_L2_GAS_PRICE},
+        config::{
+            cache::CacheConfig,
+            constants::{
+                DEFAULT_ACCOUNT_BALANCE, DEFAULT_L2_GAS_PRICE, NON_FORK_FIRST_BLOCK_TIMESTAMP,
+            },
+        },
         fork::ForkDetails,
         http_fork_source::HttpForkSource,
         node::{compute_hash, InMemoryNode, Snapshot},
@@ -1493,6 +1489,14 @@ mod tests {
     };
     use zksync_types::{web3, Nonce};
     use zksync_web3_decl::types::{SyncState, ValueOrArray};
+
+    async fn test_node(url: &str) -> InMemoryNode<HttpForkSource> {
+        InMemoryNode::<HttpForkSource>::default_fork(Some(
+            ForkDetails::from_network(url, None, &CacheConfig::None)
+                .await
+                .unwrap(),
+        ))
+    }
 
     #[tokio::test]
     async fn test_eth_syncing() {
@@ -1597,7 +1601,7 @@ mod tests {
             .expect("no block");
 
         assert_eq!(0, block.number.as_u64());
-        assert_eq!(compute_hash(0, H256::zero()), block.hash);
+        assert_eq!(compute_hash(0, []), block.hash);
     }
 
     #[tokio::test]
@@ -1605,7 +1609,7 @@ mod tests {
         let node = InMemoryNode::<HttpForkSource>::default();
 
         let block = node
-            .get_block_by_hash(compute_hash(0, H256::zero()), false)
+            .get_block_by_hash(compute_hash(0, []), false)
             .await
             .expect("failed fetching block by hash")
             .expect("no block");
@@ -1701,15 +1705,7 @@ mod tests {
             transaction_count: 0,
         });
 
-        let node = InMemoryNode::<HttpForkSource>::new(
-            Some(
-                ForkDetails::from_network(&mock_server.url(), None, &CacheConfig::None)
-                    .await
-                    .unwrap(),
-            ),
-            None,
-            &Default::default(),
-        );
+        let node = test_node(&mock_server.url()).await;
 
         let inner = node.get_inner();
         let inner = inner.read().unwrap();
@@ -1749,15 +1745,7 @@ mod tests {
             }),
             block_response,
         );
-        let node = InMemoryNode::<HttpForkSource>::new(
-            Some(
-                ForkDetails::from_network(&mock_server.url(), None, &CacheConfig::None)
-                    .await
-                    .unwrap(),
-            ),
-            None,
-            &Default::default(),
-        );
+        let node = test_node(&mock_server.url()).await;
 
         let actual_block = node
             .get_block_by_hash(input_block_hash, false)
@@ -1906,15 +1894,7 @@ mod tests {
             }),
             block_response,
         );
-        let node = InMemoryNode::<HttpForkSource>::new(
-            Some(
-                ForkDetails::from_network(&mock_server.url(), None, &CacheConfig::None)
-                    .await
-                    .unwrap(),
-            ),
-            None,
-            &Default::default(),
-        );
+        let node = test_node(&mock_server.url()).await;
 
         let actual_block = node
             .get_block_by_number(BlockNumber::Number(U64::from(8)), false)
@@ -1958,15 +1938,7 @@ mod tests {
             transaction_count: 0,
         });
 
-        let node = InMemoryNode::<HttpForkSource>::new(
-            Some(
-                ForkDetails::from_network(&mock_server.url(), None, &CacheConfig::None)
-                    .await
-                    .unwrap(),
-            ),
-            None,
-            &Default::default(),
-        );
+        let node = test_node(&mock_server.url()).await;
 
         let actual_block = node
             .get_block_by_number(BlockNumber::Latest, false)
@@ -1998,15 +1970,7 @@ mod tests {
                 .set_number(input_block_number)
                 .build(),
         );
-        let node = InMemoryNode::<HttpForkSource>::new(
-            Some(
-                ForkDetails::from_network(&mock_server.url(), None, &CacheConfig::None)
-                    .await
-                    .unwrap(),
-            ),
-            None,
-            &Default::default(),
-        );
+        let node = test_node(&mock_server.url()).await;
 
         let actual_block = node
             .get_block_by_number(BlockNumber::Earliest, false)
@@ -2029,15 +1993,7 @@ mod tests {
                 hash: H256::repeat_byte(0xab),
                 transaction_count: 0,
             });
-            let node = InMemoryNode::<HttpForkSource>::new(
-                Some(
-                    ForkDetails::from_network(&mock_server.url(), None, &CacheConfig::None)
-                        .await
-                        .unwrap(),
-                ),
-                None,
-                &Default::default(),
-            );
+            let node = test_node(&mock_server.url()).await;
 
             let actual_block = node
                 .get_block_by_number(block_number, false)
@@ -2091,15 +2047,7 @@ mod tests {
                 "result": format!("{:#x}", input_transaction_count),
             }),
         );
-        let node = InMemoryNode::<HttpForkSource>::new(
-            Some(
-                ForkDetails::from_network(&mock_server.url(), None, &CacheConfig::None)
-                    .await
-                    .unwrap(),
-            ),
-            None,
-            &Default::default(),
-        );
+        let node = test_node(&mock_server.url()).await;
 
         let actual_transaction_count = node
             .get_block_transaction_count_by_hash(input_block_hash)
@@ -2152,15 +2100,7 @@ mod tests {
             }),
         );
 
-        let node = InMemoryNode::<HttpForkSource>::new(
-            Some(
-                ForkDetails::from_network(&mock_server.url(), None, &CacheConfig::None)
-                    .await
-                    .unwrap(),
-            ),
-            None,
-            &Default::default(),
-        );
+        let node = test_node(&mock_server.url()).await;
 
         let actual_transaction_count = node
             .get_block_transaction_count_by_number(BlockNumber::Number(U64::from(1)))
@@ -2198,15 +2138,7 @@ mod tests {
             }),
         );
 
-        let node = InMemoryNode::<HttpForkSource>::new(
-            Some(
-                ForkDetails::from_network(&mock_server.url(), None, &CacheConfig::None)
-                    .await
-                    .unwrap(),
-            ),
-            None,
-            &Default::default(),
-        );
+        let node = test_node(&mock_server.url()).await;
 
         let actual_transaction_count = node
             .get_block_transaction_count_by_number(BlockNumber::Earliest)
@@ -2235,15 +2167,7 @@ mod tests {
                 hash: H256::repeat_byte(0xab),
             });
 
-            let node = InMemoryNode::<HttpForkSource>::new(
-                Some(
-                    ForkDetails::from_network(&mock_server.url(), None, &CacheConfig::None)
-                        .await
-                        .unwrap(),
-                ),
-                None,
-                &Default::default(),
-            );
+            let node = test_node(&mock_server.url()).await;
 
             let actual_transaction_count = node
                 .get_block_transaction_count_by_number(block_number)
@@ -2514,15 +2438,7 @@ mod tests {
             }),
         );
 
-        let node = InMemoryNode::<HttpForkSource>::new(
-            Some(
-                ForkDetails::from_network(&mock_server.url(), None, &CacheConfig::None)
-                    .await
-                    .unwrap(),
-            ),
-            None,
-            &Default::default(),
-        );
+        let node = test_node(&mock_server.url()).await;
 
         let actual_value = node
             .get_storage(
@@ -2613,15 +2529,7 @@ mod tests {
             }),
         );
 
-        let node = InMemoryNode::<HttpForkSource>::new(
-            Some(
-                ForkDetails::from_network(&mock_server.url(), None, &CacheConfig::None)
-                    .await
-                    .unwrap(),
-            ),
-            None,
-            &Default::default(),
-        );
+        let node = test_node(&mock_server.url()).await;
         node.get_inner()
             .write()
             .map(|mut writer| {
@@ -2661,7 +2569,7 @@ mod tests {
 
         let private_key = K256PrivateKey::from_bytes(H256::repeat_byte(0xef)).unwrap();
         let from_account = private_key.address();
-        node.set_rich_account(from_account);
+        node.set_rich_account(from_account, U256::from(DEFAULT_ACCOUNT_BALANCE));
 
         let deployed_address = deployed_address_create(from_account, U256::zero());
 
@@ -2693,7 +2601,7 @@ mod tests {
 
         let private_key = K256PrivateKey::from_bytes(H256::repeat_byte(0xef)).unwrap();
         let from_account = private_key.address();
-        node.set_rich_account(from_account);
+        node.set_rich_account(from_account, U256::from(DEFAULT_ACCOUNT_BALANCE));
 
         let deployed_address = deployed_address_create(from_account, U256::zero());
 
@@ -2907,7 +2815,7 @@ mod tests {
 
         let private_key = H256::repeat_byte(0x01);
         let from_account = K256PrivateKey::from_bytes(private_key).unwrap().address();
-        node.set_rich_account(from_account);
+        node.set_rich_account(from_account, U256::from(DEFAULT_ACCOUNT_BALANCE));
 
         let account_result = node.accounts().await;
         let expected_accounts: Vec<H160> = vec![from_account];
@@ -2943,12 +2851,12 @@ mod tests {
         inner.current_batch = 1;
         inner.current_miniblock = 1;
         inner.current_miniblock_hash = H256::repeat_byte(0x1);
-        inner.time.set_last_timestamp_unchecked(1);
+        node.time.set_current_timestamp_unchecked(1);
         inner
             .filters
             .add_block_filter()
             .expect("failed adding block filter");
-        inner.impersonated_accounts.insert(H160::repeat_byte(0x1));
+        inner.impersonation.impersonate(H160::repeat_byte(0x1));
         inner.rich_accounts.insert(H160::repeat_byte(0x1));
         inner
             .previous_states
@@ -2960,7 +2868,6 @@ mod tests {
 
         let storage = inner.fork_storage.inner.read().unwrap();
         let expected_snapshot = Snapshot {
-            current_timestamp: inner.time.last_timestamp(),
             current_batch: inner.current_batch,
             current_miniblock: inner.current_miniblock,
             current_miniblock_hash: inner.current_miniblock_hash,
@@ -2969,7 +2876,7 @@ mod tests {
             blocks: inner.blocks.clone(),
             block_hashes: inner.block_hashes.clone(),
             filters: inner.filters.clone(),
-            impersonated_accounts: inner.impersonated_accounts.clone(),
+            impersonation_state: inner.impersonation.state(),
             rich_accounts: inner.rich_accounts.clone(),
             previous_states: inner.previous_states.clone(),
             raw_storage: storage.raw_storage.clone(),
@@ -2978,10 +2885,6 @@ mod tests {
         };
         let actual_snapshot = inner.snapshot().expect("failed taking snapshot");
 
-        assert_eq!(
-            expected_snapshot.current_timestamp,
-            actual_snapshot.current_timestamp
-        );
         assert_eq!(
             expected_snapshot.current_batch,
             actual_snapshot.current_batch
@@ -3006,8 +2909,8 @@ mod tests {
         assert_eq!(expected_snapshot.block_hashes, actual_snapshot.block_hashes);
         assert_eq!(expected_snapshot.filters, actual_snapshot.filters);
         assert_eq!(
-            expected_snapshot.impersonated_accounts,
-            actual_snapshot.impersonated_accounts
+            expected_snapshot.impersonation_state,
+            actual_snapshot.impersonation_state
         );
         assert_eq!(
             expected_snapshot.rich_accounts,
@@ -3049,12 +2952,12 @@ mod tests {
         inner.current_batch = 1;
         inner.current_miniblock = 1;
         inner.current_miniblock_hash = H256::repeat_byte(0x1);
-        inner.time.set_last_timestamp_unchecked(1);
+        node.time.set_current_timestamp_unchecked(1);
         inner
             .filters
             .add_block_filter()
             .expect("failed adding block filter");
-        inner.impersonated_accounts.insert(H160::repeat_byte(0x1));
+        inner.impersonation.impersonate(H160::repeat_byte(0x1));
         inner.rich_accounts.insert(H160::repeat_byte(0x1));
         inner
             .previous_states
@@ -3067,7 +2970,6 @@ mod tests {
         let expected_snapshot = {
             let storage = inner.fork_storage.inner.read().unwrap();
             Snapshot {
-                current_timestamp: inner.time.last_timestamp(),
                 current_batch: inner.current_batch,
                 current_miniblock: inner.current_miniblock,
                 current_miniblock_hash: inner.current_miniblock_hash,
@@ -3076,7 +2978,7 @@ mod tests {
                 blocks: inner.blocks.clone(),
                 block_hashes: inner.block_hashes.clone(),
                 filters: inner.filters.clone(),
-                impersonated_accounts: inner.impersonated_accounts.clone(),
+                impersonation_state: inner.impersonation.state(),
                 rich_accounts: inner.rich_accounts.clone(),
                 previous_states: inner.previous_states.clone(),
                 raw_storage: storage.raw_storage.clone(),
@@ -3102,12 +3004,12 @@ mod tests {
         inner.current_batch = 2;
         inner.current_miniblock = 2;
         inner.current_miniblock_hash = H256::repeat_byte(0x2);
-        inner.time.set_last_timestamp_unchecked(2);
+        node.time.set_current_timestamp_unchecked(2);
         inner
             .filters
             .add_pending_transaction_filter()
             .expect("failed adding pending transaction filter");
-        inner.impersonated_accounts.insert(H160::repeat_byte(0x2));
+        inner.impersonation.impersonate(H160::repeat_byte(0x2));
         inner.rich_accounts.insert(H160::repeat_byte(0x2));
         inner
             .previous_states
@@ -3123,10 +3025,6 @@ mod tests {
             .expect("failed restoring snapshot");
 
         let storage = inner.fork_storage.inner.read().unwrap();
-        assert_eq!(
-            expected_snapshot.current_timestamp,
-            inner.time.last_timestamp()
-        );
         assert_eq!(expected_snapshot.current_batch, inner.current_batch);
         assert_eq!(expected_snapshot.current_miniblock, inner.current_miniblock);
         assert_eq!(
@@ -3146,8 +3044,8 @@ mod tests {
         assert_eq!(expected_snapshot.block_hashes, inner.block_hashes);
         assert_eq!(expected_snapshot.filters, inner.filters);
         assert_eq!(
-            expected_snapshot.impersonated_accounts,
-            inner.impersonated_accounts
+            expected_snapshot.impersonation_state,
+            inner.impersonation.state()
         );
         assert_eq!(expected_snapshot.rich_accounts, inner.rich_accounts);
         assert_eq!(expected_snapshot.previous_states, inner.previous_states);
@@ -3230,15 +3128,7 @@ mod tests {
                 .build(),
         );
 
-        let node = InMemoryNode::<HttpForkSource>::new(
-            Some(
-                ForkDetails::from_network(&mock_server.url(), None, &CacheConfig::None)
-                    .await
-                    .unwrap(),
-            ),
-            None,
-            &Default::default(),
-        );
+        let node = test_node(&mock_server.url()).await;
 
         // store the block info with just the tx hash invariant
         {
@@ -3289,15 +3179,7 @@ mod tests {
                 .build(),
         );
 
-        let node = InMemoryNode::<HttpForkSource>::new(
-            Some(
-                ForkDetails::from_network(&mock_server.url(), None, &CacheConfig::None)
-                    .await
-                    .unwrap(),
-            ),
-            None,
-            &Default::default(),
-        );
+        let node = test_node(&mock_server.url()).await;
 
         let actual_tx = node
             .get_transaction_by_block_hash_and_index(input_block_hash, U64::from(1))
@@ -3388,15 +3270,7 @@ mod tests {
                 .build(),
         );
 
-        let node = InMemoryNode::<HttpForkSource>::new(
-            Some(
-                ForkDetails::from_network(&mock_server.url(), None, &CacheConfig::None)
-                    .await
-                    .unwrap(),
-            ),
-            None,
-            &Default::default(),
-        );
+        let node = test_node(&mock_server.url()).await;
 
         // store the block info with just the tx hash invariant
         {
@@ -3454,15 +3328,7 @@ mod tests {
                 .build(),
         );
 
-        let node = InMemoryNode::<HttpForkSource>::new(
-            Some(
-                ForkDetails::from_network(&mock_server.url(), None, &CacheConfig::None)
-                    .await
-                    .unwrap(),
-            ),
-            None,
-            &Default::default(),
-        );
+        let node = test_node(&mock_server.url()).await;
 
         let actual_tx = node
             .get_transaction_by_block_number_and_index(
