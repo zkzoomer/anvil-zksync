@@ -36,17 +36,17 @@ use zksync_types::{
     fee_model::FeeParams,
     l2::L2Tx,
     url::SensitiveUrl,
-    ProtocolVersionId, StorageKey,
+    ProtocolVersionId, StorageKey, SLChainId,
 };
 
 // use zksync_multivm::interface::storage::ReadStorage;
-// use zksync_basic_types::{h256_to_u256};
-// use zksync_types::bytecode::BytecodeHash;
+use zksync_basic_types::{h256_to_u256};
+use zksync_types::bytecode::BytecodeHash;
 
 use zksync_types::{
     Address, L1BatchNumber, L2BlockNumber, L2ChainId, StorageValue, H256, U256, U64,
 };
-use zksync_utils::{bytecode::hash_bytecode, h256_to_u256};
+// use zksync_utils::{bytecode::hash_bytecode, h256_to_u256};
 use zksync_web3_decl::{
     client::{Client, L2},
     namespaces::ZksNamespaceClient,
@@ -327,6 +327,11 @@ impl<S: std::fmt::Debug + ForkSource> ReadStorage for ForkStorage<S> {
     fn get_enumeration_index(&mut self, key: &StorageKey) -> Option<u64> {
         self.get_enumeration_index_internal(key)
     }
+    
+    fn get_message_root(&mut self, chain_id: SLChainId, block_number: L2BlockNumber) -> Option<H256> {
+        // TODO: Implement this
+        None
+    }
 }
 
 impl<S: std::fmt::Debug + ForkSource> ReadStorage for &ForkStorage<S> {
@@ -344,6 +349,11 @@ impl<S: std::fmt::Debug + ForkSource> ReadStorage for &ForkStorage<S> {
 
     fn get_enumeration_index(&mut self, key: &StorageKey) -> Option<u64> {
         self.get_enumeration_index_internal(key)
+    }
+
+    fn get_message_root(&mut self, chain_id: SLChainId, block_number: L2BlockNumber) -> Option<H256> {
+        // TODO: Implement this
+        None
     }
 }
 
@@ -549,7 +559,8 @@ impl ForkDetails {
                 url
             )
         })?;
-        let l1_batch_number = block_details.l1_batch_number;
+        println!("block: {:?}", block_details);
+        let l1_batch_number: L1BatchNumber = block_details.l1_batch_number;
 
         if !block_details
             .protocol_version
@@ -634,7 +645,7 @@ impl ForkDetails {
             .get_transaction_by_hash(tx)
             .await
             .map_err(|error| eyre!(error))?;
-        let tx_details = opt_tx_details.ok_or_else(|| eyre!("could not find {:?}", tx))?;
+        let tx_details = opt_tx_details.clone().ok_or_else(|| eyre!("could not find {:?}", tx))?;
         let overwrite_chain_id = L2ChainId::try_from(tx_details.chain_id.as_u64())
             .map_err(|error| eyre!("erroneous chain id {}: {:?}", tx_details.chain_id, error))?;
         let block_number = tx_details
@@ -643,7 +654,7 @@ impl ForkDetails {
         let miniblock_number = L2BlockNumber(block_number.as_u32());
         // We have to sync to the one-miniblock before the one where transaction is.
         let l2_miniblock = miniblock_number.saturating_sub(1) as u64;
-
+        // println!("opt_tx_details: {:?}", &opt_tx_details);
         Self::from_network_and_miniblock_and_chain(
             network,
             client,

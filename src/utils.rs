@@ -12,9 +12,10 @@ use zksync_types::{
     api::{BlockNumber, DebugCall, DebugCallType},
     l2::L2Tx,
     web3::Bytes,
-    CONTRACT_DEPLOYER_ADDRESS, H256, U256, U64,
+    CONTRACT_DEPLOYER_ADDRESS, H256, U256, U64
 };
-use zksync_utils::bytes_to_be_words;
+use zksync_basic_types::{h256_to_u256};
+use zksync_multivm::utils::bytecode::bytes_to_be_words;
 use zksync_types::bytecode::BytecodeHash;
 use zksync_web3_decl::error::Web3Error;
 
@@ -61,7 +62,7 @@ pub fn bytecode_to_factory_dep(bytecode: Vec<u8>) -> Result<(U256, Vec<U256>), a
     zksync_basic_types::bytecode::validate_bytecode(&bytecode).context("Invalid bytecode")?;
     let bytecode_hash = zksync_types::bytecode::BytecodeHash::for_bytecode(&bytecode).value_u256();
 
-    let bytecode_words = bytes_to_be_words(bytecode);
+    let bytecode_words = bytes_to_be_words(&bytecode);
 
     Ok((bytecode_hash, bytecode_words))
 }

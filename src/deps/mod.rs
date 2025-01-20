@@ -2,7 +2,7 @@ use std::collections::HashMap;
 pub mod system_contracts;
 use zksync_types::{
     get_code_key, get_system_contracts_init_logs, L2ChainId, StorageKey, StorageLog, StorageValue,
-    H256,
+    H256, SLChainId, L2BlockNumber
 };
 pub mod storage_view;
 use zksync_multivm::interface::storage::ReadStorage;
@@ -76,6 +76,10 @@ impl ReadStorage for &InMemoryStorage {
         //       This should happen as the migration of Boojum completes
         Some(0_u64)
     }
+
+    fn get_message_root(&mut self, _chain_id: SLChainId, _block_number: L2BlockNumber) -> Option<H256> {
+        None
+    }
 }
 
 impl ReadStorage for InMemoryStorage {
@@ -93,5 +97,9 @@ impl ReadStorage for InMemoryStorage {
 
     fn get_enumeration_index(&mut self, key: &StorageKey) -> Option<u64> {
         (&*self).get_enumeration_index(key)
+    }
+
+    fn get_message_root(&mut self, chain_id: SLChainId, block_number: L2BlockNumber) -> Option<H256> {
+        None
     }
 }

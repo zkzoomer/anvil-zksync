@@ -49,8 +49,7 @@ use zksync_types::{
     H256, H64, MAX_L2_TX_GAS_LIMIT, SYSTEM_CONTEXT_ADDRESS, SYSTEM_CONTEXT_BLOCK_INFO_POSITION,
     U256, U64,
 };
-use zksync_utils::h256_to_account_address;
-use zksync_basic_types::{h256_to_u256, u256_to_h256};
+use zksync_basic_types::{h256_to_u256, u256_to_h256, h256_to_address};
 use zksync_web3_decl::error::Web3Error;
 use zksync_types::bytecode::BytecodeHash;
 
@@ -1101,7 +1100,7 @@ pub struct InMemoryNode<S: Clone> {
 fn contract_address_from_tx_result(execution_result: &VmExecutionResultAndLogs) -> Option<H160> {
     for query in execution_result.logs.storage_logs.iter().rev() {
         if query.log.is_write() && query.log.key.address() == &ACCOUNT_CODE_STORAGE_ADDRESS {
-            return Some(h256_to_account_address(query.log.key.key()));
+            return Some(h256_to_address(query.log.key.key()));
         }
     }
     None

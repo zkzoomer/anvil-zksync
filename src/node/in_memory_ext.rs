@@ -19,7 +19,8 @@ use zksync_types::{
     L2BlockNumber, StorageKey,
 };
 use zksync_types::{AccountTreeId, Address, H256, U256, U64};
-use zksync_utils::u256_to_h256;
+use zksync_basic_types::{u256_to_h256};
+
 
 type Result<T> = anyhow::Result<T>;
 
