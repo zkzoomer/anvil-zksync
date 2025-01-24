@@ -1417,12 +1417,11 @@ impl InMemoryNodeInner {
         calldata: Option<Vec<u8>>,
         nonce: zksync_types::Nonce,
     ) -> H256 {
-        use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
-        use alloy_json_abi::{Function, Param, StateMutability};
-        use alloy_zksync::network::unsigned_tx::eip712::hash_bytecode;
+        use alloy::dyn_abi::{DynSolValue, JsonAbiExt};
+        use alloy::json_abi::{Function, Param, StateMutability};
 
         let salt = [0u8; 32];
-        let bytecode_hash = hash_bytecode(&bytecode).expect("invalid bytecode");
+        let bytecode_hash = BytecodeHash::for_bytecode(&bytecode).value().0;
         let call_data = calldata.unwrap_or_default();
 
         let create = Function {
@@ -1563,8 +1562,8 @@ mod tests {
     use crate::node::inner::fork_storage::ForkStorage;
     use crate::testing;
     use crate::testing::{TransactionBuilder, STORAGE_CONTRACT_BYTECODE};
-    use alloy_dyn_abi::{DynSolType, DynSolValue};
-    use alloy_primitives::U256 as AlloyU256;
+    use alloy::dyn_abi::{DynSolType, DynSolValue};
+    use alloy::primitives::U256 as AlloyU256;
     use anvil_zksync_config::constants::{
         DEFAULT_ACCOUNT_BALANCE, DEFAULT_ESTIMATE_GAS_PRICE_SCALE_FACTOR,
         DEFAULT_ESTIMATE_GAS_SCALE_FACTOR, DEFAULT_FAIR_PUBDATA_PRICE, DEFAULT_L2_GAS_PRICE,
