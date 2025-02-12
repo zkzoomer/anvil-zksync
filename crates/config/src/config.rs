@@ -133,6 +133,14 @@ pub struct TestNodeConfig {
     pub preserve_historical_states: bool,
     /// State to load
     pub load_state: Option<PathBuf>,
+    /// L1 configuration, disabled if `None`
+    pub l1_config: Option<L1Config>,
+}
+
+#[derive(Debug, Clone)]
+pub struct L1Config {
+    /// Port the spawned L1 anvil node will listen on
+    pub port: u16,
 }
 
 impl Default for TestNodeConfig {
@@ -206,6 +214,7 @@ impl Default for TestNodeConfig {
             state_interval: None,
             preserve_historical_states: false,
             load_state: None,
+            l1_config: None,
         }
     }
 }
@@ -358,9 +367,9 @@ impl TestNodeConfig {
 
         tracing::info!("Node Configuration");
         tracing::info!("========================");
-        tracing::info!("Port:               {}", self.port);
+        tracing::info!("Port:                  {}", self.port);
         tracing::info!(
-            "EVM Emulator:       {}",
+            "EVM Emulator:          {}",
             if self.use_evm_emulator {
                 "Enabled".green()
             } else {
@@ -376,13 +385,28 @@ impl TestNodeConfig {
             }
         );
         tracing::info!(
-            "ZK OS:              {}",
+            "ZK OS:                 {}",
             if self.use_zkos {
                 "Enabled".green()
             } else {
                 "Disabled".red()
             }
         );
+        tracing::info!(
+            "L1:                    {}",
+            if self.l1_config.is_some() {
+                "Enabled".green()
+            } else {
+                "Disabled".red()
+            }
+        );
+
+        if let Some(l1_config) = self.l1_config.as_ref() {
+            println!("\n");
+            tracing::info!("L1 Configuration");
+            tracing::info!("========================");
+            tracing::info!("Port: {}", l1_config.port);
+        }
 
         println!("\n");
         tracing::info!("========================================");
@@ -977,6 +1001,13 @@ impl TestNodeConfig {
     #[must_use]
     pub fn with_load_state(mut self, load_state: Option<PathBuf>) -> Self {
         self.load_state = load_state;
+        self
+    }
+
+    /// Set the L1 config
+    #[must_use]
+    pub fn with_l1_config(mut self, l1_config: Option<L1Config>) -> Self {
+        self.l1_config = l1_config;
         self
     }
 }

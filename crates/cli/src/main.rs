@@ -17,9 +17,12 @@ use anvil_zksync_core::node::{
 };
 use anvil_zksync_core::observability::Observability;
 use anvil_zksync_core::system_contracts::SystemContracts;
+use anvil_zksync_l1_sidecar::L1Sidecar;
 use anyhow::{anyhow, Context};
 use clap::Parser;
 use std::fs::File;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 use std::{env, net::SocketAddr, str::FromStr};
@@ -186,6 +189,16 @@ async fn main() -> anyhow::Result<()> {
         None
     };
 
+    let mut node_service_tasks: Vec<Pin<Box<dyn Future<Output = anyhow::Result<()>>>>> = Vec::new();
+    let l1_sidecar = match config.l1_config.as_ref() {
+        Some(l1_config) => {
+            let (l1_sidecar, l1_sidecar_runner) = L1Sidecar::builtin(l1_config.port).await?;
+            node_service_tasks.push(Box::pin(l1_sidecar_runner.run()));
+            l1_sidecar
+        }
+        None => L1Sidecar::none(),
+    };
+
     let impersonation = ImpersonationManager::default();
     if config.enable_auto_impersonate {
         // Enable auto impersonation if configured
@@ -231,6 +244,7 @@ async fn main() -> anyhow::Result<()> {
     };
     let (block_sealer, block_sealer_state) =
         BlockSealer::new(sealing_mode, pool.clone(), node_handle.clone());
+    node_service_tasks.push(Box::pin(block_sealer.run()));
 
     let node: InMemoryNode = InMemoryNode::new(
         node_inner,
@@ -290,6 +304,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mut server_builder = NodeServerBuilder::new(
         node.clone(),
+        l1_sidecar,
         AllowOrigin::exact(
             config
                 .allow_origin
@@ -369,8 +384,10 @@ async fn main() -> anyhow::Result<()> {
         dump_interval,
         preserve_historical_states,
     );
+    node_service_tasks.push(Box::pin(state_dumper));
 
     config.print(fork_print_info.as_ref());
+    let node_service_stopped = futures::future::select_all(node_service_tasks);
 
     tokio::select! {
         _ = tokio::signal::ctrl_c() => {
@@ -379,12 +396,9 @@ async fn main() -> anyhow::Result<()> {
         _ = any_server_stopped => {
             tracing::trace!("node server was stopped")
         },
-        _ = block_sealer.run() => {
-            tracing::trace!("block sealer was stopped")
-        },
-        _ = state_dumper => {
-            tracing::trace!("state dumper was stopped")
-        },
+        _ = node_service_stopped => {
+            tracing::trace!("node service was stopped")
+        }
     }
 
     Ok(())
