@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 pub mod system_contracts;
 use zksync_types::{
-    get_code_key, get_system_contracts_init_logs, L2ChainId, StorageKey, StorageLog, StorageValue,
+    get_code_key, get_system_context_init_logs, L2ChainId, StorageKey, StorageLog, StorageValue,
     H256, SLChainId, L2BlockNumber
 };
 pub mod storage_view;
@@ -25,7 +25,7 @@ impl InMemoryStorage {
         let contracts =
             system_contracts::get_deployed_contracts(system_contracts_options, use_evm_emulator);
 
-        let system_context_init_log = get_system_contracts_init_logs(chain_id);
+        let system_context_init_log = get_system_context_init_logs(chain_id);
 
         let state = contracts
             .iter()
