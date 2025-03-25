@@ -190,6 +190,7 @@ pub(super) enum Command {
         oneshot::Sender<BatchTransactionExecutionResult>,
     ),
     StartNextL2Block(L2BlockEnv, oneshot::Sender<()>),
+    InsertMessageRoot(MessageRoot, oneshot::Sender<()>),
     RollbackLastTx(oneshot::Sender<()>),
     FinishBatch(oneshot::Sender<FinishedL1Batch>),
     Bootloader(oneshot::Sender<VmExecutionResultAndLogs>),
