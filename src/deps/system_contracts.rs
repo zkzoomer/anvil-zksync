@@ -35,9 +35,10 @@ pub fn bytecode_from_slice(artifact_name: &str, contents: &[u8]) -> Vec<u8> {
     let artifact: Value = serde_json::from_slice(contents).expect(artifact_name);
     let bytecode = artifact["bytecode"]
         .as_str()
-        .unwrap_or_else(|| panic!("Bytecode not found in {:?}", artifact_name))
-        .strip_prefix("0x")
-        .unwrap_or_else(|| panic!("Bytecode in {:?} is not hex", artifact_name));
+        .or_else(|| artifact["bytecode"]["object"].as_str())
+        .unwrap_or_else(|| panic!("Bytecode not found in {:?}", artifact_name));
+    // Strip an optional `0x` prefix.
+    let bytecode = bytecode.strip_prefix("0x").unwrap_or(bytecode);
 
     hex::decode(bytecode)
         .unwrap_or_else(|err| panic!("Can't decode bytecode in {:?}: {}", artifact_name, err))

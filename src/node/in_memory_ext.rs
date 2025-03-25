@@ -11,6 +11,7 @@ use crate::{
 use anyhow::{anyhow, Context};
 use std::convert::TryInto;
 use std::time::Duration;
+use zksync_basic_types::u256_to_h256;
 use zksync_multivm::interface::TxExecutionMode;
 use zksync_types::api::{Block, TransactionVariant};
 use zksync_types::{
@@ -19,8 +20,6 @@ use zksync_types::{
     L2BlockNumber, StorageKey,
 };
 use zksync_types::{AccountTreeId, Address, H256, U256, U64};
-use zksync_basic_types::{u256_to_h256};
-
 
 type Result<T> = anyhow::Result<T>;
 

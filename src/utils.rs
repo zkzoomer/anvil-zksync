@@ -7,16 +7,16 @@ use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 use std::fs;
 use std::{convert::TryInto, fmt, pin::Pin};
+use zksync_basic_types::h256_to_u256;
 use zksync_multivm::interface::{Call, CallType, ExecutionResult, VmExecutionResultAndLogs};
+use zksync_multivm::utils::bytecode::bytes_to_be_words;
+use zksync_types::bytecode::BytecodeHash;
 use zksync_types::{
     api::{BlockNumber, DebugCall, DebugCallType},
     l2::L2Tx,
     web3::Bytes,
-    CONTRACT_DEPLOYER_ADDRESS, H256, U256, U64
+    CONTRACT_DEPLOYER_ADDRESS, H256, U256, U64,
 };
-use zksync_basic_types::{h256_to_u256};
-use zksync_multivm::utils::bytecode::bytes_to_be_words;
-use zksync_types::bytecode::BytecodeHash;
 use zksync_web3_decl::error::Web3Error;
 
 pub(crate) trait IntoBoxedFuture: Sized + Send + 'static {

@@ -14,6 +14,7 @@ use std::{
     str::FromStr,
     sync::{Arc, RwLock},
 };
+use zksync_basic_types::{h256_to_address, h256_to_u256, u256_to_h256};
 use zksync_contracts::BaseSystemContracts;
 use zksync_multivm::vm_latest::HistoryEnabled;
 use zksync_multivm::{
@@ -35,6 +36,7 @@ use zksync_multivm::{
     },
     HistoryMode, VmVersion,
 };
+use zksync_types::bytecode::BytecodeHash;
 use zksync_types::{
     api::{Block, DebugCall, Log, TransactionReceipt, TransactionVariant},
     block::{build_bloom, unpack_block_info, L2BlockHasher},
@@ -49,9 +51,7 @@ use zksync_types::{
     H256, H64, MAX_L2_TX_GAS_LIMIT, SYSTEM_CONTEXT_ADDRESS, SYSTEM_CONTEXT_BLOCK_INFO_POSITION,
     U256, U64,
 };
-use zksync_basic_types::{h256_to_u256, u256_to_h256, h256_to_address};
 use zksync_web3_decl::error::Web3Error;
-use zksync_types::bytecode::BytecodeHash;
 
 use crate::fork::SerializableStorage;
 use crate::node::error::LoadStateError;

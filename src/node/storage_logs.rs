@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::formatter::{self, PubdataBytesInfo};
 
 use crate::config::show_details::ShowStorageLogs;
+use zksync_basic_types::h256_to_u256;
 use zksync_multivm::interface::VmExecutionResultAndLogs;
 use zksync_types::{
     utils::storage_key_for_eth_balance,
@@ -13,7 +14,6 @@ use zksync_types::{
     StorageKey, BOOTLOADER_ADDRESS, SYSTEM_CONTEXT_ADDRESS,
 };
 use zksync_types::{StorageLogKind, StorageLogWithPreviousValue};
-use zksync_basic_types::{h256_to_u256};
 
 fn is_storage_key_free(key: &StorageKey) -> bool {
     key.address() == &SYSTEM_CONTEXT_ADDRESS

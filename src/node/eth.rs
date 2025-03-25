@@ -4,6 +4,7 @@ use anyhow::Context as _;
 use colored::Colorize;
 use futures::FutureExt;
 use itertools::Itertools;
+use zksync_basic_types::{h256_to_u256, u256_to_h256};
 use zksync_multivm::interface::{ExecutionResult, TxExecutionMode};
 use zksync_multivm::vm_latest::constants::ETH_CALL_GAS_LIMIT;
 use zksync_types::{
@@ -19,7 +20,6 @@ use zksync_types::{
     web3::{self, Bytes},
     AccountTreeId, Address, H160, H256, U256, U64,
 };
-use zksync_basic_types::{h256_to_u256, u256_to_h256};
 use zksync_web3_decl::{
     error::Web3Error,
     types::{FeeHistory, Filter, FilterChanges, SyncState},

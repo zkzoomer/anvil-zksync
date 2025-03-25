@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
 use zksync_multivm::interface::storage::{ReadStorage, WriteStorage};
-use zksync_types::{StorageKey, StorageValue, H256, SLChainId, L2BlockNumber};
+use zksync_types::{L2BlockNumber, SLChainId, StorageKey, StorageValue, H256};
 
 /// `StorageView` is a buffer for `StorageLog`s between storage and transaction execution code.
 /// In order to commit transactions logs should be submitted to the underlying storage
@@ -95,7 +95,11 @@ impl<S: ReadStorage + fmt::Debug> ReadStorage for StorageView<S> {
         self.storage_handle.get_enumeration_index(key)
     }
 
-    fn get_message_root(&mut self, chain_id: SLChainId, block_number: L2BlockNumber) -> Option<H256> {
+    fn get_message_root(
+        &mut self,
+        chain_id: SLChainId,
+        block_number: L2BlockNumber,
+    ) -> Option<H256> {
         // TODO: Implement this
         None
     }

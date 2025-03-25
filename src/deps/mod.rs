@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 pub mod system_contracts;
 use zksync_types::{
-    get_code_key, get_system_context_init_logs, L2ChainId, StorageKey, StorageLog, StorageValue,
-    H256, SLChainId, L2BlockNumber
+    get_code_key, get_system_context_init_logs, L2BlockNumber, L2ChainId, SLChainId, StorageKey,
+    StorageLog, StorageValue, H256,
 };
 pub mod storage_view;
 use zksync_multivm::interface::storage::ReadStorage;
@@ -77,7 +77,11 @@ impl ReadStorage for &InMemoryStorage {
         Some(0_u64)
     }
 
-    fn get_message_root(&mut self, _chain_id: SLChainId, _block_number: L2BlockNumber) -> Option<H256> {
+    fn get_message_root(
+        &mut self,
+        _chain_id: SLChainId,
+        _block_number: L2BlockNumber,
+    ) -> Option<H256> {
         None
     }
 }
@@ -99,7 +103,11 @@ impl ReadStorage for InMemoryStorage {
         (&*self).get_enumeration_index(key)
     }
 
-    fn get_message_root(&mut self, chain_id: SLChainId, block_number: L2BlockNumber) -> Option<H256> {
+    fn get_message_root(
+        &mut self,
+        chain_id: SLChainId,
+        block_number: L2BlockNumber,
+    ) -> Option<H256> {
         None
     }
 }

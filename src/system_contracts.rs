@@ -1,11 +1,11 @@
 use clap::ValueEnum;
 use serde::Deserialize;
+use zksync_basic_types::h256_to_u256;
 use zksync_contracts::{
     read_bootloader_code, read_sys_contract_bytecode, BaseSystemContracts,
     BaseSystemContractsHashes, ContractLanguage, SystemContractCode,
 };
 use zksync_multivm::{interface::TxExecutionMode, utils::bytecode::bytes_to_be_words};
-use zksync_basic_types::{h256_to_u256};
 // use zksync_utils::{bytes_to_be_words};
 use zksync_types::bytecode::BytecodeHash;
 

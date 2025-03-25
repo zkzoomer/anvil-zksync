@@ -36,11 +36,11 @@ use zksync_types::{
     fee_model::FeeParams,
     l2::L2Tx,
     url::SensitiveUrl,
-    ProtocolVersionId, StorageKey, SLChainId,
+    ProtocolVersionId, SLChainId, StorageKey,
 };
 
 // use zksync_multivm::interface::storage::ReadStorage;
-use zksync_basic_types::{h256_to_u256};
+use zksync_basic_types::h256_to_u256;
 use zksync_types::bytecode::BytecodeHash;
 
 use zksync_types::{
@@ -327,8 +327,12 @@ impl<S: std::fmt::Debug + ForkSource> ReadStorage for ForkStorage<S> {
     fn get_enumeration_index(&mut self, key: &StorageKey) -> Option<u64> {
         self.get_enumeration_index_internal(key)
     }
-    
-    fn get_message_root(&mut self, chain_id: SLChainId, block_number: L2BlockNumber) -> Option<H256> {
+
+    fn get_message_root(
+        &mut self,
+        chain_id: SLChainId,
+        block_number: L2BlockNumber,
+    ) -> Option<H256> {
         // TODO: Implement this
         None
     }
@@ -351,7 +355,11 @@ impl<S: std::fmt::Debug + ForkSource> ReadStorage for &ForkStorage<S> {
         self.get_enumeration_index_internal(key)
     }
 
-    fn get_message_root(&mut self, chain_id: SLChainId, block_number: L2BlockNumber) -> Option<H256> {
+    fn get_message_root(
+        &mut self,
+        chain_id: SLChainId,
+        block_number: L2BlockNumber,
+    ) -> Option<H256> {
         // TODO: Implement this
         None
     }
@@ -498,6 +506,7 @@ const SUPPORTED_VERSIONS: &[ProtocolVersionId] = &[
     ProtocolVersionId::Version25,
     ProtocolVersionId::Version26,
     ProtocolVersionId::Version27,
+    ProtocolVersionId::Version28,
 ];
 
 pub fn supported_protocol_versions(version: ProtocolVersionId) -> bool {
@@ -645,7 +654,9 @@ impl ForkDetails {
             .get_transaction_by_hash(tx)
             .await
             .map_err(|error| eyre!(error))?;
-        let tx_details = opt_tx_details.clone().ok_or_else(|| eyre!("could not find {:?}", tx))?;
+        let tx_details = opt_tx_details
+            .clone()
+            .ok_or_else(|| eyre!("could not find {:?}", tx))?;
         let overwrite_chain_id = L2ChainId::try_from(tx_details.chain_id.as_u64())
             .map_err(|error| eyre!("erroneous chain id {}: {:?}", tx_details.chain_id, error))?;
         let block_number = tx_details

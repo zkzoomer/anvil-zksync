@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use bigdecimal::BigDecimal;
 use colored::Colorize;
 use futures::FutureExt;
+use zksync_basic_types::h256_to_u256;
 use zksync_types::{
     api::{
         BlockDetails, BlockDetailsBase, BlockStatus, BridgeAddresses, Proof, ProtocolVersion,
@@ -13,7 +14,6 @@ use zksync_types::{
     AccountTreeId, Address, ExecuteTransactionCommon, L1BatchNumber, L2BlockNumber,
     ProtocolVersionId, Transaction, H160, H256, L2_BASE_TOKEN_ADDRESS, U256,
 };
-use zksync_basic_types::{h256_to_u256};
 use zksync_web3_decl::error::Web3Error;
 
 use crate::{
@@ -579,12 +579,12 @@ impl<S: ForkSource + std::fmt::Debug + Clone + Send + Sync + 'static> ZksNamespa
 mod tests {
     use std::str::FromStr;
 
+    use zksync_basic_types::u256_to_h256;
     use zksync_types::{
         api::{self, Block, TransactionReceipt, TransactionVariant},
         transaction_request::CallRequest,
         Address, H160, H256,
     };
-    use zksync_basic_types::u256_to_h256;
 
     use super::*;
     use crate::{
