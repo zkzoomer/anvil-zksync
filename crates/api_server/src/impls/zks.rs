@@ -152,6 +152,24 @@ impl ZksNamespaceServer for ZksNamespace {
             .map_err(RpcError::from)?)
     }
 
+    async fn get_l2_to_l1_log_proof_precommit(
+        &self,
+        tx_hash: H256,
+        index: Option<usize>,
+        l2_message_index: Option<usize>,
+    ) -> RpcResult<Option<L2ToL1LogProof>> {
+        Ok(None)
+    }
+
+    async fn get_l2_to_l1_log_proof_until_chain_id(
+        &self,
+        tx_hash: H256,
+        index: Option<usize>,
+        chain_id: Option<U64>,
+    ) -> RpcResult<Option<L2ToL1LogProof>> {
+        Ok(None)
+    }
+
     async fn get_l1_batch_number(&self) -> RpcResult<U64> {
         Err(RpcError::Unsupported.into())
     }

@@ -19,8 +19,8 @@ use zksync_multivm::interface::storage::ReadStorage;
 use zksync_types::bytecode::BytecodeHash;
 use zksync_types::web3::Bytes;
 use zksync_types::{
-    get_system_context_key, h256_to_u256, L2ChainId, StorageKey, StorageValue, H256,
-    SYSTEM_CONTEXT_CHAIN_ID_POSITION,
+    get_system_context_key, h256_to_u256, L2BlockNumber, L2ChainId, SLChainId, StorageKey,
+    StorageValue, H256, SYSTEM_CONTEXT_CHAIN_ID_POSITION,
 };
 
 /// In memory storage, that allows 'forking' from other network.
@@ -146,6 +146,14 @@ impl ForkStorage {
         Some(0_u64)
     }
 
+    fn get_message_root_internal(
+        &self,
+        _chain_id: SLChainId,
+        _block_number: L2BlockNumber,
+    ) -> Option<H256> {
+        todo!()
+    }
+
     /// Creates a serializable representation of current storage state. It will contain both locally
     /// stored data and cached data read from the fork.
     pub fn dump_state(&self) -> SerializableForkStorage {
@@ -205,6 +213,14 @@ impl ReadStorage for ForkStorage {
     fn get_enumeration_index(&mut self, key: &StorageKey) -> Option<u64> {
         self.get_enumeration_index_internal(key)
     }
+
+    fn get_message_root(
+        &mut self,
+        chain_id: SLChainId,
+        block_number: L2BlockNumber,
+    ) -> Option<H256> {
+        self.get_message_root_internal(chain_id, block_number)
+    }
 }
 
 impl ReadStorage for &ForkStorage {
@@ -222,6 +238,14 @@ impl ReadStorage for &ForkStorage {
 
     fn get_enumeration_index(&mut self, key: &StorageKey) -> Option<u64> {
         self.get_enumeration_index_internal(key)
+    }
+
+    fn get_message_root(
+        &mut self,
+        chain_id: SLChainId,
+        block_number: L2BlockNumber,
+    ) -> Option<H256> {
+        self.get_message_root_internal(chain_id, block_number)
     }
 }
 

@@ -933,7 +933,7 @@ impl ForkSource for Fork {
 struct SupportedProtocolVersions;
 
 impl SupportedProtocolVersions {
-    const SUPPORTED_VERSIONS: [ProtocolVersionId; 18] = [
+    const SUPPORTED_VERSIONS: [ProtocolVersionId; 20] = [
         ProtocolVersionId::Version9,
         ProtocolVersionId::Version10,
         ProtocolVersionId::Version11,
@@ -952,6 +952,8 @@ impl SupportedProtocolVersions {
         ProtocolVersionId::Version24,
         ProtocolVersionId::Version25,
         ProtocolVersionId::Version26,
+        ProtocolVersionId::Version27,
+        ProtocolVersionId::Version28,
     ];
 
     fn is_supported(version: ProtocolVersionId) -> bool {

@@ -11,7 +11,7 @@ use zksync_multivm::interface::{
     storage::{ReadStorage, StorageView},
     BatchTransactionExecutionResult, FinishedL1Batch, L2BlockEnv, VmExecutionResultAndLogs,
 };
-use zksync_types::Transaction;
+use zksync_types::{message_root::MessageRoot, Transaction};
 
 #[derive(Debug)]
 enum HandleOrError<S> {
@@ -176,6 +176,10 @@ where
         };
         let storage_view = self.handle.wait().await?;
         Ok((finished_batch, storage_view))
+    }
+
+    async fn insert_message_root(&mut self, _msg_root: MessageRoot) -> anyhow::Result<()> {
+        todo!()
     }
 }
 

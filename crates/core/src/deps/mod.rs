@@ -2,8 +2,8 @@ use anvil_zksync_config::types::SystemContractsOptions;
 use std::collections::HashMap;
 use zksync_multivm::interface::storage::ReadStorage;
 use zksync_types::{
-    get_code_key, get_known_code_key, get_system_context_init_logs, L2ChainId, SLChainId, StorageKey,
-    StorageLog, StorageValue, H256,
+    get_code_key, get_known_code_key, get_system_context_init_logs, L2BlockNumber, L2ChainId,
+    SLChainId, StorageKey, StorageLog, StorageValue, H256,
 };
 
 pub mod storage_view;

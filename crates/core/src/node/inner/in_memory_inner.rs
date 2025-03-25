@@ -44,13 +44,13 @@ use zksync_multivm::vm_latest::constants::{
 };
 use zksync_multivm::vm_latest::{HistoryDisabled, Vm};
 use zksync_multivm::VmVersion;
+use zksync_system_constants::message_root::{AGG_TREE_HEIGHT_KEY, AGG_TREE_NODES_KEY};
 use zksync_types::api::{BlockIdVariant, TransactionVariant};
 use zksync_types::block::build_bloom;
 use zksync_types::fee::Fee;
 use zksync_types::fee_model::{BatchFeeInput, PubdataIndependentBatchFeeModelInput};
 use zksync_types::l1::L1Tx;
 use zksync_types::l2::{L2Tx, TransactionType};
-use zksync_types::message_root::{AGG_TREE_HEIGHT_KEY, AGG_TREE_NODES_KEY};
 use zksync_types::transaction_request::CallRequest;
 use zksync_types::utils::{decompose_full_nonce, nonces_to_full_nonce};
 use zksync_types::web3::{keccak256, Index};
@@ -534,7 +534,9 @@ impl InMemoryNodeInner {
                 self.system_contracts.use_zkos,
             );
 
-            if result.statistics.pubdata_published > MAX_VM_PUBDATA_PER_BATCH.try_into().unwrap() {
+            if result.statistics.pubdata_published
+                > <usize as TryInto<u32>>::try_into(MAX_VM_PUBDATA_PER_BATCH).unwrap()
+            {
                 return Err(Web3Error::SubmitTransactionError(
                     "exceeds limit for published pubdata".into(),
                     Default::default(),
