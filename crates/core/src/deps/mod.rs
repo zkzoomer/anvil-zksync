@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use zksync_multivm::interface::storage::ReadStorage;
 use zksync_types::{
     get_code_key, get_known_code_key, get_system_context_init_logs, L2BlockNumber, L2ChainId,
-    SLChainId, StorageKey, StorageLog, StorageValue, H256,
+    SLChainId, StorageKey, StorageLog, StorageValue, H256, ProtocolVersionId
 };
 
 pub mod storage_view;
@@ -21,9 +21,11 @@ impl InMemoryStorage {
     pub fn with_system_contracts_and_chain_id(
         chain_id: L2ChainId,
         bytecode_hasher: impl Fn(&[u8]) -> H256,
-        system_contracts_options: &SystemContractsOptions,
+        system_contracts_options: SystemContractsOptions,
+        protocol_version: ProtocolVersionId,
     ) -> Self {
-        let contracts = system_contracts::get_deployed_contracts(system_contracts_options);
+        let contracts =
+            system_contracts::get_deployed_contracts(system_contracts_options, protocol_version);
 
         let system_context_init_log = get_system_context_init_logs(chain_id);
         let state = contracts
