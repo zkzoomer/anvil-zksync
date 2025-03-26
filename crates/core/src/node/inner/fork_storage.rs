@@ -19,8 +19,8 @@ use zksync_multivm::interface::storage::ReadStorage;
 use zksync_types::bytecode::BytecodeHash;
 use zksync_types::web3::Bytes;
 use zksync_types::{
-    get_system_context_key, h256_to_u256, L2BlockNumber, L2ChainId, SLChainId, StorageKey,
-    StorageValue, H256, SYSTEM_CONTEXT_CHAIN_ID_POSITION, ProtocolVersionId
+    get_system_context_key, h256_to_u256, L2BlockNumber, L2ChainId, ProtocolVersionId, SLChainId,
+    StorageKey, StorageValue, H256, SYSTEM_CONTEXT_CHAIN_ID_POSITION,
 };
 
 /// In memory storage, that allows 'forking' from other network.
