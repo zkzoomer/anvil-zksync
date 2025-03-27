@@ -1,7 +1,7 @@
 #!/bin/bash
 set -xe
 
-PROTOCOL_VERSION=${1:-v27}
+PROTOCOL_VERSION=${1:-v28}
 case $PROTOCOL_VERSION in
   v26)
     # HEAD of anvil-zksync-0.4.x-release-v26
@@ -10,6 +10,10 @@ case $PROTOCOL_VERSION in
   v27)
     # HEAD of anvil-zksync-0.4.x-release-v27
     ERA_CONTRACTS_GIT_COMMIT=f0e17d700929e25292be971ea5196368bf120cea
+    ;;
+  v28)
+    # HEAD of anvil-zksync-0.4.x-release-v28
+    ERA_CONTRACTS_GIT_COMMIT=07a789244c66c4e9b2b8623ea4cfe39396ad81c2
     ;;
   *)
     echo "Unrecognized/unsupported protocol version: $PROTOCOL_VERSION"
@@ -46,6 +50,24 @@ precompiles=("EcAdd" "EcMul" "Ecrecover" "Keccak256" "SHA256" "EcPairing" "CodeO
 bootloaders=(
   "fee_estimate" "gas_test" "playground_batch" "proved_batch" "proved_batch_impersonating" "fee_estimate_impersonating"
 )
+
+# zksolc 1.5.11 changed where yul artifacts' path
+# TODO: Check is this was intended and get rid of this workaround if not
+if [[ $PROTOCOL_VERSION == v28 ]]; then
+  for bootloader in "${bootloaders[@]}"; do
+    cp "$SYSTEM_ARTIFACTS_SRC_DIR/$bootloader.yul/Bootloader.json" "$SYSTEM_ARTIFACTS_SRC_DIR/$bootloader.yul/$bootloader.json"
+  done
+fi
+
+if [[ ! $PROTOCOL_VERSION < v27 ]]; then
+  # New precompile that was added in v27
+  precompiles+=("Identity")
+fi
+
+if [[ ! $PROTOCOL_VERSION < v28 ]]; then
+  # New precompile that was added in v28
+  precompiles+=("Modexp")
+fi
 
 for artifact in "${l1_artifacts[@]}"; do
   FILES="$FILES $L1_ARTIFACTS_SRC_DIR/$artifact.sol/$artifact.json"
