@@ -289,6 +289,7 @@ async fn start_program() -> Result<(), AnvilZksyncError> {
                 blockchain.clone(),
                 node_handle.clone(),
                 pool.clone(),
+                config.auto_execute_l1,
             )
             .await
             .map_err(to_domain)?;
@@ -302,6 +303,7 @@ async fn start_program() -> Result<(), AnvilZksyncError> {
                 blockchain.clone(),
                 node_handle.clone(),
                 pool.clone(),
+                config.auto_execute_l1,
             )
             .await
             .map_err(to_domain)?;
