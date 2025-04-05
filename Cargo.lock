@@ -8329,7 +8329,7 @@ dependencies = [
 [[package]]
 name = "zksync_basic_types"
 version = "27.0.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era?branch=kl%2Finterop-support#f4ebeecfebd9d01a31a8b036c3f1ff63e5252341"
+source = "git+https://github.com/matter-labs/zksync-era?branch=kl%2Freduced-interop-support#a6288686e152a4e3d6921c29198ecf6c2c30db0d"
 dependencies = [
  "anyhow",
  "chrono",
@@ -8393,7 +8393,7 @@ dependencies = [
 [[package]]
 name = "zksync_config"
 version = "27.0.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era?branch=kl%2Finterop-support#f4ebeecfebd9d01a31a8b036c3f1ff63e5252341"
+source = "git+https://github.com/matter-labs/zksync-era?branch=kl%2Freduced-interop-support#a6288686e152a4e3d6921c29198ecf6c2c30db0d"
 dependencies = [
  "anyhow",
  "rand 0.8.5",
@@ -8420,7 +8420,7 @@ dependencies = [
 [[package]]
 name = "zksync_contracts"
 version = "27.0.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era?branch=kl%2Finterop-support#f4ebeecfebd9d01a31a8b036c3f1ff63e5252341"
+source = "git+https://github.com/matter-labs/zksync-era?branch=kl%2Freduced-interop-support#a6288686e152a4e3d6921c29198ecf6c2c30db0d"
 dependencies = [
  "envy",
  "hex",
@@ -8434,7 +8434,7 @@ dependencies = [
 [[package]]
 name = "zksync_crypto_primitives"
 version = "27.0.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era?branch=kl%2Finterop-support#f4ebeecfebd9d01a31a8b036c3f1ff63e5252341"
+source = "git+https://github.com/matter-labs/zksync-era?branch=kl%2Freduced-interop-support#a6288686e152a4e3d6921c29198ecf6c2c30db0d"
 dependencies = [
  "anyhow",
  "blake2",
@@ -8451,7 +8451,7 @@ dependencies = [
 [[package]]
 name = "zksync_da_client"
 version = "27.0.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era?branch=kl%2Finterop-support#f4ebeecfebd9d01a31a8b036c3f1ff63e5252341"
+source = "git+https://github.com/matter-labs/zksync-era?branch=kl%2Freduced-interop-support#a6288686e152a4e3d6921c29198ecf6c2c30db0d"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8502,7 +8502,7 @@ dependencies = [
 [[package]]
 name = "zksync_mini_merkle_tree"
 version = "27.0.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era?branch=kl%2Finterop-support#f4ebeecfebd9d01a31a8b036c3f1ff63e5252341"
+source = "git+https://github.com/matter-labs/zksync-era?branch=kl%2Freduced-interop-support#a6288686e152a4e3d6921c29198ecf6c2c30db0d"
 dependencies = [
  "once_cell",
  "zksync_basic_types",
@@ -8512,7 +8512,7 @@ dependencies = [
 [[package]]
 name = "zksync_multivm"
 version = "27.0.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era?branch=kl%2Finterop-support#f4ebeecfebd9d01a31a8b036c3f1ff63e5252341"
+source = "git+https://github.com/matter-labs/zksync-era?branch=kl%2Freduced-interop-support#a6288686e152a4e3d6921c29198ecf6c2c30db0d"
 dependencies = [
  "anyhow",
  "circuit_sequencer_api",
@@ -8552,7 +8552,7 @@ dependencies = [
 [[package]]
 name = "zksync_system_constants"
 version = "27.0.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era?branch=kl%2Finterop-support#f4ebeecfebd9d01a31a8b036c3f1ff63e5252341"
+source = "git+https://github.com/matter-labs/zksync-era?branch=kl%2Freduced-interop-support#a6288686e152a4e3d6921c29198ecf6c2c30db0d"
 dependencies = [
  "once_cell",
  "zksync_basic_types",
@@ -8578,7 +8578,7 @@ dependencies = [
 [[package]]
 name = "zksync_types"
 version = "27.0.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era?branch=kl%2Finterop-support#f4ebeecfebd9d01a31a8b036c3f1ff63e5252341"
+source = "git+https://github.com/matter-labs/zksync-era?branch=kl%2Freduced-interop-support#a6288686e152a4e3d6921c29198ecf6c2c30db0d"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8605,7 +8605,7 @@ dependencies = [
 [[package]]
 name = "zksync_utils"
 version = "27.0.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era?branch=kl%2Finterop-support#f4ebeecfebd9d01a31a8b036c3f1ff63e5252341"
+source = "git+https://github.com/matter-labs/zksync-era?branch=kl%2Freduced-interop-support#a6288686e152a4e3d6921c29198ecf6c2c30db0d"
 dependencies = [
  "anyhow",
  "once_cell",
@@ -8638,7 +8638,7 @@ dependencies = [
 [[package]]
 name = "zksync_vm_interface"
 version = "27.0.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era?branch=kl%2Finterop-support#f4ebeecfebd9d01a31a8b036c3f1ff63e5252341"
+source = "git+https://github.com/matter-labs/zksync-era?branch=kl%2Freduced-interop-support#a6288686e152a4e3d6921c29198ecf6c2c30db0d"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8655,7 +8655,7 @@ dependencies = [
 [[package]]
 name = "zksync_web3_decl"
 version = "27.0.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era?branch=kl%2Finterop-support#f4ebeecfebd9d01a31a8b036c3f1ff63e5252341"
+source = "git+https://github.com/matter-labs/zksync-era?branch=kl%2Freduced-interop-support#a6288686e152a4e3d6921c29198ecf6c2c30db0d"
 dependencies = [
  "anyhow",
  "async-trait",
