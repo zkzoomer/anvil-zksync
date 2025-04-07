@@ -21,7 +21,7 @@ case $PROTOCOL_VERSION in
     ;;
   v28)
     # HEAD of anvil-zksync-0.4.x-release-v28
-    ERA_CONTRACTS_GIT_COMMIT=07a789244c66c4e9b2b8623ea4cfe39396ad81c2
+    ERA_CONTRACTS_GIT_COMMIT=bbb3f44ea906f1841e34d3655e711beef7b07c49
     # HEAD of release-v28
     ERA_TAG=02da145d3e002c5faaca1a8a771ddbb51264551a
     ;;
