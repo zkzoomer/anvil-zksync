@@ -927,7 +927,7 @@ dependencies = [
 
 [[package]]
 name = "anvil-zksync"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "alloy",
  "anvil_zksync_api_server",
@@ -942,6 +942,7 @@ dependencies = [
  "flate2",
  "futures 0.3.31",
  "hex",
+ "indicatif",
  "itertools 0.13.0",
  "rand 0.8.5",
  "serde",
@@ -961,7 +962,7 @@ dependencies = [
 
 [[package]]
 name = "anvil_zksync_api_decl"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anvil_zksync_types",
  "jsonrpsee",
@@ -972,7 +973,7 @@ dependencies = [
 
 [[package]]
 name = "anvil_zksync_api_server"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anvil_zksync_api_decl",
  "anvil_zksync_common",
@@ -998,7 +999,7 @@ dependencies = [
 
 [[package]]
 name = "anvil_zksync_common"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "alloy",
  "anstream",
@@ -1021,7 +1022,7 @@ dependencies = [
 
 [[package]]
 name = "anvil_zksync_config"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "alloy",
  "anvil_zksync_common",
@@ -1038,7 +1039,7 @@ dependencies = [
 
 [[package]]
 name = "anvil_zksync_console"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "alloy",
  "anvil_zksync_common",
@@ -1053,7 +1054,7 @@ dependencies = [
 
 [[package]]
 name = "anvil_zksync_core"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "alloy",
  "anvil_zksync_common",
@@ -1072,6 +1073,7 @@ dependencies = [
  "hex",
  "httptest",
  "indexmap 2.6.0",
+ "indicatif",
  "itertools 0.13.0",
  "lazy_static",
  "maplit",
@@ -1099,7 +1101,7 @@ dependencies = [
 
 [[package]]
 name = "anvil_zksync_l1_sidecar"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "alloy",
  "anvil_zksync_common",
@@ -1124,7 +1126,7 @@ dependencies = [
 
 [[package]]
 name = "anvil_zksync_traces"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "alloy",
  "anstyle",
@@ -1146,7 +1148,7 @@ dependencies = [
 
 [[package]]
 name = "anvil_zksync_types"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "clap",
  "lazy_static",
@@ -2206,6 +2208,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bed69047ed42e52c7e38d6421eeb8ceefb4f2a2b52eed59137f7bad7908f6800"
 
 [[package]]
+name = "console"
+version = "0.15.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "054ccb5b10f9f2cbf51eb355ca1d05c2d279ce1804688d0db74b4733a5aeafd8"
+dependencies = [
+ "encode_unicode",
+ "libc",
+ "once_cell",
+ "unicode-width",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
 name = "const-decoder"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2824,6 +2839,12 @@ checksum = "d98e71ae4df57d214182a2e5cb90230c0192c6ddfcaa05c36453d46a54713e10"
 dependencies = [
  "stable_deref_trait",
 ]
+
+[[package]]
+name = "encode_unicode"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "34aa73646ffb006b8f5147f3dc182bd4bcb190227ce861fc4a4844bf8e3cb2c0"
 
 [[package]]
 name = "encoding_rs"
@@ -3981,6 +4002,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "indicatif"
+version = "0.17.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "183b3088984b400f4cfac3620d5e076c84da5364016b4f49473de574b2586235"
+dependencies = [
+ "console",
+ "number_prefix",
+ "portable-atomic",
+ "unicode-width",
+ "web-time",
+]
+
+[[package]]
 name = "ipnet"
 version = "2.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4331,7 +4365,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4979f22fdb869068da03c9f7528f8297c6fd2606bc3a4affe42e6a823fdb8da4"
 dependencies = [
  "cfg-if",
- "windows-targets 0.52.6",
+ "windows-targets 0.48.5",
 ]
 
 [[package]]
@@ -4680,6 +4714,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "number_prefix"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "830b246a0e5f20af87141b25c173cd1b609bd7779a4617d6ec582abaf90870f3"
+
+[[package]]
 name = "nybbles"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5016,6 +5056,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "953ec861398dccce10c670dfeaf3ec4911ca479e9c02154b3a215178c5f566f2"
 
 [[package]]
+name = "portable-atomic"
+version = "1.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "350e9b48cbc6b0e028b0473b114454c6316e57336ee184ceab6e53f72c178b3e"
+
+[[package]]
 name = "posthog-rs"
 version = "0.3.0"
 source = "git+https://github.com/Romsters/posthog-rs?rev=a54b1423100beaaa5d7eb43ff801f4b8389f9550#a54b1423100beaaa5d7eb43ff801f4b8389f9550"
@@ -5163,9 +5209,9 @@ dependencies = [
 
 [[package]]
 name = "prometheus-client"
-version = "0.22.3"
+version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "504ee9ff529add891127c4827eb481bd69dc0ebc72e9a682e187db4caa60c3ca"
+checksum = "cf41c1a7c32ed72abe5082fb19505b969095c12da9f5732a4bc9878757fd087c"
 dependencies = [
  "dtoa",
  "itoa",
@@ -6907,9 +6953,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tokio"
-version = "1.41.1"
+version = "1.44.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22cfb5bee7a6a52939ca9224d6ac897bb669134078daa8735560897f69de4d33"
+checksum = "e6b88822cbe49de4185e3a4cbf8321dd487cf5fe0c5c65695fef6346371e9c48"
 dependencies = [
  "backtrace",
  "bytes",
@@ -6926,9 +6972,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-macros"
-version = "2.4.0"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "693d596312e88961bc67d7f1f97af8a70227d9f90c31bba5806eec004978d752"
+checksum = "6e06d43f1345a3bcd39f6a56dbb7dcab2ba47e68e8ac134855e7e2bdbaf8cab8"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -7436,8 +7482,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 [[package]]
 name = "vise"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90ade36f3548b1524396f4de7b36f4f210c8a01dfab568eb2bff466af64eb6e5"
+source = "git+https://github.com/matter-labs/vise.git?rev=51669f42f60c50b3a521662a4ecd71212a303299#51669f42f60c50b3a521662a4ecd71212a303299"
 dependencies = [
  "compile-fmt",
  "ctor",
@@ -7450,8 +7495,7 @@ dependencies = [
 [[package]]
 name = "vise-macros"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a511871dc5de990a3b2a0e715facfbc5da848c0c0395597a1415029fb7c250a"
+source = "git+https://github.com/matter-labs/vise.git?rev=51669f42f60c50b3a521662a4ecd71212a303299#51669f42f60c50b3a521662a4ecd71212a303299"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -8276,7 +8320,7 @@ dependencies = [
 [[package]]
 name = "zksync-error-codegen"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-error?rev=76e8e471b048461d2754092fa159c87a47db5972#76e8e471b048461d2754092fa159c87a47db5972"
+source = "git+https://github.com/matter-labs/zksync-error?rev=fa6e84e06191a1b66323d69ab909fd83ae76e0d2#fa6e84e06191a1b66323d69ab909fd83ae76e0d2"
 dependencies = [
  "cargo_metadata",
  "derive_more 2.0.1",
@@ -8303,7 +8347,7 @@ dependencies = [
 [[package]]
 name = "zksync-error-description"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-error?rev=76e8e471b048461d2754092fa159c87a47db5972#76e8e471b048461d2754092fa159c87a47db5972"
+source = "git+https://github.com/matter-labs/zksync-error?rev=fa6e84e06191a1b66323d69ab909fd83ae76e0d2#fa6e84e06191a1b66323d69ab909fd83ae76e0d2"
 dependencies = [
  "serde",
  "serde_json",
@@ -8313,7 +8357,7 @@ dependencies = [
 [[package]]
 name = "zksync-error-model"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-error?rev=76e8e471b048461d2754092fa159c87a47db5972#76e8e471b048461d2754092fa159c87a47db5972"
+source = "git+https://github.com/matter-labs/zksync-error?rev=fa6e84e06191a1b66323d69ab909fd83ae76e0d2#fa6e84e06191a1b66323d69ab909fd83ae76e0d2"
 dependencies = [
  "derive_more 2.0.1",
  "serde",
@@ -8456,7 +8500,7 @@ dependencies = [
 
 [[package]]
 name = "zksync_error"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "lazy_static",
@@ -8465,6 +8509,7 @@ dependencies = [
  "strum 0.26.3",
  "strum_macros 0.26.4",
  "zksync-error-description",
+ "zksync_basic_types",
 ]
 
 [[package]]
@@ -8595,7 +8640,7 @@ dependencies = [
 [[package]]
 name = "zksync_telemetry"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-telemetry.git?rev=d5c35951843263765079545c31c908dcbaab1f30#d5c35951843263765079545c31c908dcbaab1f30"
+source = "git+https://github.com/matter-labs/zksync-telemetry.git?rev=f6d8618d870a09467ff24ea32ef57e01af8f311e#f6d8618d870a09467ff24ea32ef57e01af8f311e"
 dependencies = [
  "anyhow",
  "chrono",
