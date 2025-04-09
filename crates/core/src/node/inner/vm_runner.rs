@@ -1,6 +1,5 @@
 use crate::bootloader_debug::BootloaderDebug;
-use crate::formatter;
-use crate::formatter::ExecutionErrorReport;
+use crate::formatter::{self, ExecutionErrorReport};
 use crate::node::batch::{MainBatchExecutorFactory, TraceCalls};
 use crate::node::error::ToHaltError;
 use crate::node::inner::fork_storage::ForkStorage;
@@ -27,13 +26,15 @@ use indicatif::ProgressBar;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use zksync_contracts::BaseSystemContractsHashes;
+use zksync_error::anvil_zksync;
+use zksync_error::anvil_zksync::node::{AnvilNodeError, AnvilNodeResult};
 use zksync_multivm::interface::executor::BatchExecutor;
 use zksync_multivm::interface::storage::WriteStorage;
 use zksync_multivm::interface::{
     BatchTransactionExecutionResult, ExecutionResult, FinishedL1Batch, L1BatchEnv, L2BlockEnv,
     TxExecutionMode, VmEvent, VmExecutionResultAndLogs,
 };
-use zksync_multivm::zk_evm_latest::ethereum_types::{Address, H160, H256, U256, U64};
+use zksync_multivm::zk_evm_latest::ethereum_types::{Address, H160, U256, U64};
 use zksync_types::block::L2BlockHasher;
 use zksync_types::bytecode::BytecodeHash;
 use zksync_types::commitment::{PubdataParams, PubdataType};
@@ -122,42 +123,47 @@ impl VmRunner {
     fn validate_tx(
         &self,
         batch_env: &L1BatchEnv,
-        tx_hash: H256,
         tx_data: &L2TxCommonData,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), anvil_zksync::tx_invalid::TransactionValidationError> {
         let max_gas = U256::from(u64::MAX);
-        if tx_data.fee.gas_limit > max_gas || tx_data.fee.gas_per_pubdata_limit > max_gas {
-            anyhow::bail!("exceeds block gas limit");
+        if tx_data.fee.gas_limit > max_gas {
+            return Err(anvil_zksync::tx_invalid::InvalidGasLimit {
+                tx_gas_limit: Box::new(tx_data.fee.gas_limit),
+                max_gas: Box::new(max_gas),
+            });
+        }
+
+        if tx_data.fee.gas_per_pubdata_limit > max_gas {
+            return Err(anvil_zksync::tx_invalid::GasPerPubdataLimit {
+                tx_gas_per_pubdata_limit: Box::new(tx_data.fee.gas_per_pubdata_limit),
+                max_gas: Box::new(max_gas),
+            });
         }
 
         let l2_gas_price = batch_env.fee_input.fair_l2_gas_price();
         if tx_data.fee.max_fee_per_gas < l2_gas_price.into() {
-            sh_eprintln!(
-                "Submitted Tx is Unexecutable {:?} because of MaxFeePerGasTooLow {}",
-                tx_hash,
-                tx_data.fee.max_fee_per_gas
-            );
-            anyhow::bail!("block base fee higher than max fee per gas");
+            return Err(anvil_zksync::tx_invalid::MaxFeePerGasTooLow {
+                max_fee_per_gas: Box::new(tx_data.fee.max_fee_per_gas),
+                l2_gas_price: Box::new(l2_gas_price.into()),
+            });
         }
 
         if tx_data.fee.max_fee_per_gas < tx_data.fee.max_priority_fee_per_gas {
-            sh_eprintln!(
-                "Submitted Tx is Unexecutable {:?} because of MaxPriorityFeeGreaterThanMaxFee {}",
-                tx_hash,
-                tx_data.fee.max_fee_per_gas
-            );
-            anyhow::bail!("max priority fee per gas higher than max fee per gas");
+            return Err(anvil_zksync::tx_invalid::MaxPriorityFeeGreaterThanMaxFee {
+                max_fee_per_gas: Box::new(tx_data.fee.max_fee_per_gas),
+                max_priority_fee_per_gas: Box::new(tx_data.fee.max_priority_fee_per_gas),
+            });
         }
         Ok(())
     }
 
     async fn run_tx_pretty(
         &mut self,
-        tx: Transaction,
+        tx: &Transaction,
         executor: &mut dyn BatchExecutor<ForkStorage>,
         config: &TestNodeConfig,
         fee_input_provider: &TestNodeFeeInputProvider,
-    ) -> anyhow::Result<BatchTransactionExecutionResult> {
+    ) -> AnvilNodeResult<BatchTransactionExecutionResult> {
         // Check if target address has code before executing the transaction
         if let Some(to_address) = tx.recipient_account() {
             let code_key = zksync_types::get_code_key(&to_address);
@@ -180,7 +186,15 @@ impl VmRunner {
             compression_result,
             call_traces,
         } = executor.execute_tx(tx.clone()).await?;
-        compression_result?;
+        compression_result.map_err(|_inner| {
+            // We ignore `inner` because bytecode
+            // compression error currently does not hold
+            // any precise information
+            anvil_zksync::node::TransactionHalt {
+                inner: Box::new(anvil_zksync::halt::FailedToPublishCompressedBytecodes),
+                transaction_hash: Box::new(tx.hash()),
+            }
+        })?;
 
         let spent_on_pubdata =
             tx_result.statistics.gas_used - tx_result.statistics.computational_gas_used as u64;
@@ -193,12 +207,7 @@ impl VmRunner {
 
         // Print transaction summary
         if config.show_tx_summary {
-            formatter::print_transaction_summary(
-                config.get_l2_gas_price(),
-                &tx,
-                &tx_result,
-                status,
-            );
+            formatter::print_transaction_summary(config.get_l2_gas_price(), tx, &tx_result, status);
         }
         // Print gas details if enabled
         if config.show_gas_details != ShowGasDetails::None {
@@ -258,7 +267,7 @@ impl VmRunner {
     #[allow(clippy::too_many_arguments)]
     async fn run_tx(
         &mut self,
-        tx: Transaction,
+        tx: &Transaction,
         tx_index: u64,
         next_log_index: &mut usize,
         block_ctx: &BlockContext,
@@ -266,12 +275,18 @@ impl VmRunner {
         executor: &mut dyn BatchExecutor<ForkStorage>,
         config: &TestNodeConfig,
         fee_input_provider: &TestNodeFeeInputProvider,
-    ) -> anyhow::Result<TransactionResult> {
+    ) -> AnvilNodeResult<TransactionResult> {
         let tx_hash = tx.hash();
         let transaction_type = tx.tx_format();
 
         if let ExecuteTransactionCommon::L2(l2_tx_data) = &tx.common_data {
-            self.validate_tx(batch_env, tx.hash(), l2_tx_data)?;
+            // If the transaction can not be validated, we return immediately
+            self.validate_tx(batch_env, l2_tx_data).map_err(|e| {
+                anvil_zksync::node::TransactionValidationFailed {
+                    inner: Box::new(e),
+                    transaction_hash: Box::new(tx_hash),
+                }
+            })?;
         }
 
         let BatchTransactionExecutionResult {
@@ -279,23 +294,19 @@ impl VmRunner {
             compression_result: _,
             call_traces,
         } = self
-            .run_tx_pretty(tx.clone(), executor, config, fee_input_provider)
+            .run_tx_pretty(tx, executor, config, fee_input_provider)
             .await?;
 
         if let ExecutionResult::Halt { reason } = result.result {
-            let halt_error = reason.to_halt_error().await;
-
-            let error_report = ExecutionErrorReport::new(&halt_error, Some(&tx));
-            sh_println!("{}", error_report);
-
             // Halt means that something went really bad with the transaction execution
             // (in most cases invalid signature, but it could also be bootloader panic etc).
             // In such cases, we should not persist the VM data and should pretend that
             // the transaction never existed.
-            // We do not print the error here, as it was already printed above.
-            anyhow::bail!("Transaction halted due to critical error");
+            return Err(anvil_zksync::node::TransactionHalt {
+                inner: Box::new(reason.to_halt_error().await),
+                transaction_hash: Box::new(tx_hash),
+            });
         }
-
         let saved_factory_deps = VmEvent::extract_bytecodes_marked_as_known(&result.logs.events);
 
         // Get transaction factory deps
@@ -391,11 +402,11 @@ impl VmRunner {
             logs_bloom: Default::default(),
         };
         *next_log_index += result.logs.user_l2_to_l1_logs.len();
-        let debug = create_debug_output(&tx, &result, call_traces).expect("create debug output"); // OK to unwrap here as Halt is handled above
+        let debug = create_debug_output(tx, &result, call_traces).expect("create debug output"); // OK to unwrap here as Halt is handled above
 
         Ok(TransactionResult {
             info: TxExecutionInfo {
-                tx,
+                tx: tx.clone(),
                 batch_number: batch_env.number.0,
                 miniblock_number: block_ctx.miniblock,
             },
@@ -409,7 +420,7 @@ impl VmRunner {
         &mut self,
         TxBatch { txs, impersonating }: TxBatch,
         node_inner: &mut InMemoryNodeInner,
-    ) -> anyhow::Result<TxBatchExecutionResult> {
+    ) -> AnvilNodeResult<TxBatchExecutionResult> {
         let system_contracts = self
             .system_contracts
             .contracts(TxExecutionMode::VerifyExecute, impersonating)
@@ -420,10 +431,13 @@ impl VmRunner {
             node_inner.create_system_env(system_contracts, TxExecutionMode::VerifyExecute);
         let (batch_env, mut block_ctx) = node_inner.create_l1_batch_env().await;
         // Advance clock as we are consuming next timestamp for this block
-        anyhow::ensure!(
-            self.time.advance_timestamp() == block_ctx.timestamp,
-            "advancing clock produced different timestamp than expected"
-        );
+
+        if self.time.advance_timestamp() != block_ctx.timestamp {
+            return Err(anvil_zksync::node::generic_error!(
+                "Advancing clock produced different timestamp than expected. This should never happen -- please report this as a bug."
+            ));
+        };
+
         let pubdata_params = PubdataParams {
             l2_da_validator_address: Address::zero(),
             pubdata_type: PubdataType::Rollup,
@@ -467,7 +481,7 @@ impl VmRunner {
 
             let result = self
                 .run_tx(
-                    tx,
+                    &tx,
                     tx_index,
                     &mut next_log_index,
                     &block_ctx,
@@ -488,8 +502,23 @@ impl VmRunner {
                     tx_index += 1;
                 }
                 Err(e) => {
-                    sh_err!("Error while executing transaction: {e}");
-                    executor.rollback_last_tx().await?;
+                    match &e {
+                        // Validation errors are reported and the execution proceeds
+                        AnvilNodeError::TransactionValidationFailed { .. } => {
+                            let error_report = ExecutionErrorReport::new(&e, Some(&tx));
+                            sh_eprintln!("{error_report}");
+                            executor.rollback_last_tx().await?;
+                        }
+                        // Halts are reported and the execution proceeds
+                        AnvilNodeError::TransactionHalt { inner, .. } => {
+                            let error_report = ExecutionErrorReport::new(inner.as_ref(), Some(&tx));
+                            sh_eprintln!("{error_report}");
+                            executor.rollback_last_tx().await?;
+                        }
+                        // Other errors are not recoverable so we pass them up
+                        // the execution stack immediately
+                        _ => return Err(e),
+                    }
                 }
             }
         }
@@ -584,6 +613,7 @@ mod test {
     use crate::testing::{TransactionBuilder, STORAGE_CONTRACT_BYTECODE};
     use alloy::dyn_abi::{DynSolType, DynSolValue};
     use alloy::primitives::U256 as AlloyU256;
+    use anvil_zksync::node::AnvilNodeResult;
     use anvil_zksync_common::cache::CacheConfig;
     use anvil_zksync_config::constants::{
         DEFAULT_ACCOUNT_BALANCE, DEFAULT_ESTIMATE_GAS_PRICE_SCALE_FACTOR,
@@ -602,7 +632,7 @@ mod test {
     use zksync_types::l2::{L2Tx, TransactionType};
     use zksync_types::utils::deployed_address_create;
     use zksync_types::{
-        u256_to_h256, K256PrivateKey, L1BatchNumber, L2ChainId, Nonce, ProtocolVersionId,
+        u256_to_h256, K256PrivateKey, L1BatchNumber, L2ChainId, Nonce, ProtocolVersionId, H256,
     };
 
     struct VmRunnerTester {
@@ -651,14 +681,14 @@ mod test {
                 .set_value(key, u256_to_h256(U256::from(DEFAULT_ACCOUNT_BALANCE)));
         }
 
-        async fn test_tx(&mut self, tx: Transaction) -> anyhow::Result<TransactionResult> {
+        async fn test_tx(&mut self, tx: Transaction) -> AnvilNodeResult<TransactionResult> {
             Ok(self.test_txs(vec![tx]).await?.into_iter().next().unwrap())
         }
 
         async fn test_txs(
             &mut self,
             txs: Vec<Transaction>,
-        ) -> anyhow::Result<Vec<TransactionResult>> {
+        ) -> AnvilNodeResult<Vec<TransactionResult>> {
             let system_env = SystemEnv {
                 zk_porter_available: false,
                 version: ProtocolVersionId::latest(),
@@ -716,7 +746,7 @@ mod test {
                 results.push(
                     self.vm_runner
                         .run_tx(
-                            tx,
+                            &tx,
                             i as u64,
                             &mut log_index,
                             &block_ctx,
@@ -753,8 +783,16 @@ mod test {
         let tx = TransactionBuilder::new()
             .set_gas_limit(U256::from(u64::MAX) + 1)
             .build();
+        let max_gas = U256::from(u64::MAX);
+        let expected = AnvilNodeError::TransactionValidationFailed {
+            transaction_hash: Box::new(tx.hash()),
+            inner: Box::new(anvil_zksync::tx_invalid::InvalidGasLimit {
+                tx_gas_limit: Box::new(tx.common_data.fee.gas_limit),
+                max_gas: Box::new(max_gas),
+            }),
+        };
         let err = tester.test_tx(tx.into()).await.unwrap_err();
-        assert_eq!(err.to_string(), "exceeds block gas limit");
+        assert_eq!(err, expected);
     }
 
     #[tokio::test]
@@ -763,24 +801,34 @@ mod test {
         let tx = TransactionBuilder::new()
             .set_max_fee_per_gas(U256::from(DEFAULT_L2_GAS_PRICE - 1))
             .build();
+        let expected = AnvilNodeError::TransactionValidationFailed {
+            transaction_hash: Box::new(tx.hash()),
+            inner: Box::new(anvil_zksync::tx_invalid::MaxFeePerGasTooLow {
+                max_fee_per_gas: Box::new(tx.common_data.fee.max_fee_per_gas),
+                l2_gas_price: Box::new(DEFAULT_L2_GAS_PRICE.into()),
+            }),
+        };
         let err = tester.test_tx(tx.into()).await.unwrap_err();
-        assert_eq!(
-            err.to_string(),
-            "block base fee higher than max fee per gas"
-        );
+        assert_eq!(err, expected);
     }
 
     #[tokio::test]
     async fn test_run_l2_tx_validates_tx_max_priority_fee_per_gas_higher_than_max_fee_per_gas() {
         let mut tester = VmRunnerTester::new();
+        let max_priority_fee_per_gas = U256::from(250_000_000 + 1);
         let tx = TransactionBuilder::new()
-            .set_max_priority_fee_per_gas(U256::from(250_000_000 + 1))
+            .set_max_priority_fee_per_gas(max_priority_fee_per_gas)
             .build();
+
+        let expected = AnvilNodeError::TransactionValidationFailed {
+            transaction_hash: Box::new(tx.hash()),
+            inner: Box::new(anvil_zksync::tx_invalid::MaxPriorityFeeGreaterThanMaxFee {
+                max_fee_per_gas: Box::new(tx.common_data.fee.max_fee_per_gas),
+                max_priority_fee_per_gas: Box::new(tx.common_data.fee.max_priority_fee_per_gas),
+            }),
+        };
         let err = tester.test_tx(tx.into()).await.unwrap_err();
-        assert_eq!(
-            err.to_string(),
-            "max priority fee per gas higher than max fee per gas"
-        );
+        assert_eq!(err, expected);
     }
 
     #[tokio::test]
