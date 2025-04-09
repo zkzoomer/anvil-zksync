@@ -18,7 +18,7 @@ use anvil_zksync_core::node::{
     NodeExecutor, StorageKeyLayout, TestNodeFeeInputProvider, TxBatch, TxPool,
 };
 use anvil_zksync_core::observability::Observability;
-use anvil_zksync_core::system_contracts::SystemContracts;
+use anvil_zksync_core::system_contracts::SystemContractsBuilder;
 use anvil_zksync_l1_sidecar::L1Sidecar;
 use anvil_zksync_types::L2TxBuilder;
 use anyhow::Context;
@@ -27,6 +27,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use std::fmt::Write;
 use std::fs::File;
 use std::future::Future;
+use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
@@ -197,11 +198,29 @@ async fn start_program() -> Result<(), AnvilZksyncError> {
         }
     };
 
-    if matches!(
-        config.system_contracts_options,
-        SystemContractsOptions::Local
-    ) {
-        if let Some(path) = env::var_os("ZKSYNC_HOME") {
+    // Ensure that system_contracts_path is only used with Local.
+    if config.system_contracts_options != SystemContractsOptions::Local
+        && config.system_contracts_path.is_some()
+    {
+        return Err(to_domain(generic_error!(
+            "The --system-contracts-path option can only be specified when --dev-system-contracts is set to 'local'."
+        )));
+    }
+    if let SystemContractsOptions::Local = config.system_contracts_options {
+        // if local system contracts specified, check if the path exists else use env var
+        // ZKSYNC_HOME
+        let path: Option<PathBuf> = config
+            .system_contracts_path
+            .clone()
+            .or_else(|| env::var_os("ZKSYNC_HOME").map(PathBuf::from));
+
+        if let Some(path) = path {
+            if !path.exists() || !path.is_dir() {
+                return Err(to_domain(generic_error!(
+                    "The specified system contracts path '{}' does not exist or is not a directory.",
+                    path.to_string_lossy()
+                )));
+            }
             tracing::debug!("Reading local contracts from {:?}", path);
         }
     }
@@ -249,12 +268,16 @@ async fn start_program() -> Result<(), AnvilZksyncError> {
     let fee_input_provider =
         TestNodeFeeInputProvider::from_fork(fork_client.as_ref().map(|f| &f.details));
     let filters = Arc::new(RwLock::new(EthFilters::default()));
-    let system_contracts = SystemContracts::from_options(
-        config.system_contracts_options,
-        config.protocol_version(),
-        config.use_evm_emulator,
-        config.use_zkos,
-    );
+
+    // Build system contracts
+    let system_contracts = SystemContractsBuilder::new()
+        .system_contracts_options(config.system_contracts_options)
+        .system_contracts_path(config.system_contracts_path.clone())
+        .protocol_version(config.protocol_version())
+        .use_evm_emulator(config.use_evm_emulator)
+        .use_zkos(config.use_zkos)
+        .build();
+
     let storage_key_layout = if config.use_zkos {
         StorageKeyLayout::ZkOs
     } else {
