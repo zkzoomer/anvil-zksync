@@ -1,7 +1,7 @@
 use lazy_static::lazy_static;
 use serde::Deserialize;
 use std::collections::HashMap;
-use zksync_multivm::interface::{Call, ExecutionResult, VmEvent, VmExecutionResultAndLogs};
+use zksync_multivm::interface::{Call, ExecutionResult, VmEvent};
 use zksync_types::{
     l2_to_l1_log::{SystemL2ToL1Log, UserL2ToL1Log},
     web3::Bytes,
@@ -188,8 +188,6 @@ impl CallLog {
 /// A trace of a call with optional decoded data.
 #[derive(Clone, Debug)]
 pub struct CallTrace {
-    /// The depth of the call.
-    pub depth: usize,
     /// Whether the call was successful.
     pub success: bool,
     /// The caller address.
@@ -201,7 +199,7 @@ pub struct CallTrace {
     /// - [`CallKind::Create`] and alike: the address of the created contract
     pub address: Address,
     /// The execution result of the call.
-    pub execution_result: VmExecutionResultAndLogs,
+    pub execution_result: ExecutionResult,
     /// Optional complementary decoded call data.
     pub decoded: DecodedCallTrace,
     /// The call trace
@@ -244,13 +242,10 @@ impl Default for CallTraceNode {
             children: Vec::new(),
             idx: 0,
             trace: CallTrace {
-                depth: 0,
                 success: true,
                 caller: H160::zero(),
                 address: H160::zero(),
-                execution_result: VmExecutionResultAndLogs::mock(ExecutionResult::Success {
-                    output: vec![],
-                }),
+                execution_result: ExecutionResult::Success { output: vec![] },
                 decoded: DecodedCallTrace::default(),
                 call: Call::default(),
             },
@@ -288,13 +283,10 @@ impl Default for CallTraceArena {
             children: Vec::new(),
             idx: 0,
             trace: CallTrace {
-                depth: 0,
                 success: true,
                 caller: H160::zero(),
                 address: H160::zero(),
-                execution_result: VmExecutionResultAndLogs::mock(ExecutionResult::Success {
-                    output: vec![],
-                }),
+                execution_result: ExecutionResult::Success { output: vec![] },
                 decoded: DecodedCallTrace::default(),
                 call: Call::default(),
             },
