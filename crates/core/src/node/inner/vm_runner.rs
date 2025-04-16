@@ -15,7 +15,6 @@ use crate::utils::create_debug_output;
 use anvil_zksync_common::shell::get_shell;
 use anvil_zksync_common::{sh_eprintln, sh_err, sh_println, sh_warn};
 use anvil_zksync_config::TestNodeConfig;
-use anvil_zksync_console::console_log::ConsoleLogHandler;
 use anvil_zksync_traces::decode::CallTraceDecoderBuilder;
 use anvil_zksync_traces::{
     build_call_trace_arena, decode_trace_arena, filter_call_trace_arena,
@@ -51,7 +50,6 @@ pub struct VmRunner {
     time: Time,
     fork_storage: ForkStorage,
     system_contracts: SystemContracts,
-    console_log_handler: ConsoleLogHandler,
     /// Whether VM should generate system logs.
     generate_system_logs: bool,
     /// Optional field for reporting progress while replaying transactions.
@@ -88,7 +86,6 @@ impl VmRunner {
             time,
             fork_storage,
             system_contracts,
-            console_log_handler: ConsoleLogHandler::default(),
             generate_system_logs,
             progress_report: None,
         }
@@ -206,9 +203,7 @@ impl VmRunner {
         };
 
         // Print transaction summary
-        if config.show_tx_summary {
-            formatter::print_transaction_summary(config.get_l2_gas_price(), tx, &tx_result, status);
-        }
+        formatter::print_transaction_summary(config.get_l2_gas_price(), tx, &tx_result, status);
         // Print gas details if enabled
         if config.show_gas_details != ShowGasDetails::None {
             self.display_detailed_gas_info(
@@ -248,11 +243,6 @@ impl VmRunner {
             let filtered_arena = filter_call_trace_arena(&arena, verbosity);
             let trace_output = render_trace_arena_inner(&filtered_arena, false);
             sh_println!("\nTraces:\n{}", trace_output);
-
-            if !config.disable_console_log {
-                self.console_log_handler
-                    .handle_calls_recursive(&call_traces);
-            }
         }
 
         Ok(BatchTransactionExecutionResult {
