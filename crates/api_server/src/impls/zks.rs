@@ -65,7 +65,7 @@ impl ZksNamespaceServer for ZksNamespace {
         ))
     }
 
-    async fn get_main_contract(&self) -> RpcResult<Address> {
+    async fn get_main_l1_contract(&self) -> RpcResult<Address> {
         Err(RpcError::Unsupported.into())
     }
 
@@ -250,6 +250,10 @@ impl ZksNamespaceServer for ZksNamespace {
     }
 
     async fn get_timestamp_asserter(&self) -> RpcResult<Option<Address>> {
+        Err(RpcError::Unsupported.into())
+    }
+
+    async fn get_l2_multicall3(&self) -> RpcResult<Option<Address>> {
         Err(RpcError::Unsupported.into())
     }
 }
