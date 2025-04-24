@@ -1,7 +1,7 @@
 #!/bin/bash
 set -xe
 
-PROTOCOL_VERSION=${1:-v28}
+PROTOCOL_VERSION=${1:-v29}
 case $PROTOCOL_VERSION in
   v26)
     # HEAD of anvil-zksync-0.4.x-release-v26
@@ -14,6 +14,7 @@ case $PROTOCOL_VERSION in
   v28)
     # HEAD of anvil-zksync-0.4.x-release-v28
     ERA_CONTRACTS_GIT_COMMIT=07a789244c66c4e9b2b8623ea4cfe39396ad81c2
+    ;;
   v29)
     ERA_CONTRACTS_GIT_COMMIT=cd9906af3988e0dbde825bc51fcb50b21498c321
     ;;
@@ -59,7 +60,7 @@ bootloaders=(
 
 # zksolc 1.5.11 changed where yul artifacts' path
 # TODO: Check is this was intended and get rid of this workaround if not
-if [[ $PROTOCOL_VERSION == v28 ]]; then
+if [[ ! $PROTOCOL_VERSION < v28 ]]; then
   for bootloader in "${bootloaders[@]}"; do
     cp "$SYSTEM_ARTIFACTS_SRC_DIR/$bootloader.yul/Bootloader.json" "$SYSTEM_ARTIFACTS_SRC_DIR/$bootloader.yul/$bootloader.json"
   done

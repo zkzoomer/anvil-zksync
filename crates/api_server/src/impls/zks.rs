@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use zksync_types::api::state_override::StateOverride;
 use zksync_types::api::{
     BlockDetails, BridgeAddresses, L1BatchDetails, L2ToL1LogProof, Proof, ProtocolVersion,
-    TransactionDetailedResult, TransactionDetails,
+    TransactionDetailedResult, TransactionDetails,LogProofTarget
 };
 use zksync_types::fee::Fee;
 use zksync_types::fee_model::{FeeParams, PubdataIndependentBatchFeeModelInput};
@@ -152,11 +152,11 @@ impl ZksNamespaceServer for ZksNamespace {
             .map_err(RpcError::from)?)
     }
 
-    async fn get_l2_to_l1_log_proof_until_chain_id(
+    async fn get_l2_to_l1_log_proof_until_target(
         &self,
         tx_hash: H256,
         index: Option<usize>,
-        chain_id: Option<U64>,
+        log_proof_target: Option<LogProofTarget>,
     ) -> RpcResult<Option<L2ToL1LogProof>> {
         Ok(None)
     }

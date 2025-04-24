@@ -365,12 +365,6 @@ impl<S: ReadStorage + 'static, Tr: BatchTracer> CommandReceiver<S, Tr> {
                         break;
                     }
                 }
-                Command::InsertMessageRoot(msg_root, resp) => {
-                    // vm.insert_message_root(msg_root)?;
-                    if resp.send(()).is_err() {
-                        break;
-                    }
-                }
                 Command::FinishBatch(resp) => {
                     let vm_block_result = self.finish_batch(&mut vm, pubdata_builder)?;
                     if resp.send(vm_block_result).is_err() {

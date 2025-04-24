@@ -218,14 +218,6 @@ impl ReadStorage for ForkStorage {
     fn get_enumeration_index(&mut self, key: &StorageKey) -> Option<u64> {
         self.get_enumeration_index_internal(key)
     }
-
-    fn get_message_root(
-        &mut self,
-        chain_id: SLChainId,
-        block_number: L2BlockNumber,
-    ) -> Option<H256> {
-        self.get_message_root_internal(chain_id, block_number)
-    }
 }
 
 impl ReadStorage for &ForkStorage {
@@ -243,14 +235,6 @@ impl ReadStorage for &ForkStorage {
 
     fn get_enumeration_index(&mut self, key: &StorageKey) -> Option<u64> {
         self.get_enumeration_index_internal(key)
-    }
-
-    fn get_message_root(
-        &mut self,
-        chain_id: SLChainId,
-        block_number: L2BlockNumber,
-    ) -> Option<H256> {
-        self.get_message_root_internal(chain_id, block_number)
     }
 }
 

@@ -11,7 +11,7 @@ use zksync_multivm::interface::{
     storage::{ReadStorage, StorageView},
     BatchTransactionExecutionResult, FinishedL1Batch, L2BlockEnv, VmExecutionResultAndLogs,
 };
-use zksync_types::{message_root::MessageRoot, Transaction};
+use zksync_types::Transaction;
 
 #[derive(Debug)]
 enum HandleOrError<S> {
@@ -180,10 +180,6 @@ where
         let storage_view = self.handle.wait().await?;
         Ok((finished_batch, storage_view))
     }
-
-    async fn insert_message_root(&mut self, _msg_root: MessageRoot) -> anyhow::Result<()> {
-        todo!()
-    }
 }
 
 #[derive(Debug)]
@@ -193,7 +189,6 @@ pub(super) enum Command {
         oneshot::Sender<BatchTransactionExecutionResult>,
     ),
     StartNextL2Block(L2BlockEnv, oneshot::Sender<()>),
-    InsertMessageRoot(MessageRoot, oneshot::Sender<()>),
     RollbackLastTx(oneshot::Sender<()>),
     FinishBatch(oneshot::Sender<FinishedL1Batch>),
     Bootloader(oneshot::Sender<VmExecutionResultAndLogs>),

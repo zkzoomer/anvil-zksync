@@ -87,14 +87,6 @@ impl ReadStorage for &InMemoryStorage {
         //       This should happen as the migration of Boojum completes
         Some(0_u64)
     }
-
-    fn get_message_root(
-        &mut self,
-        _chain_id: SLChainId,
-        _block_number: L2BlockNumber,
-    ) -> Option<H256> {
-        None
-    }
 }
 
 impl ReadStorage for InMemoryStorage {
@@ -112,13 +104,5 @@ impl ReadStorage for InMemoryStorage {
 
     fn get_enumeration_index(&mut self, key: &StorageKey) -> Option<u64> {
         (&*self).get_enumeration_index(key)
-    }
-
-    fn get_message_root(
-        &mut self,
-        chain_id: SLChainId,
-        block_number: L2BlockNumber,
-    ) -> Option<H256> {
-        None
     }
 }
