@@ -44,7 +44,7 @@ static BUILTIN_CONTRACT_ARCHIVES: [(ProtocolVersionId, &[u8]); 4] = [
         include_bytes!("contracts/builtin-contracts-v28.tar.gz"),
     ),
     (
-        ProtocolVersionId::Version28,
+        ProtocolVersionId::Version29,
         include_bytes!("contracts/builtin-contracts-v29.tar.gz"),
     ),
 ];
