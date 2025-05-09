@@ -398,12 +398,13 @@ impl InMemoryNode {
         let storage = StorageView::new(inner.read_storage()).to_rc_ptr();
 
         let mut vm = if self.system_contracts.boojum.use_boojum {
-            AnvilVM::ZKOs(super::boojumos::BoojumOsVM::<_, HistoryDisabled>::new(
+            AnvilVM::BoojumOs(super::boojumos::BoojumOsVM::<_, HistoryDisabled>::new(
                 batch_env,
                 system_env,
                 storage,
                 // TODO: this might be causing a deadlock.. check..
                 &inner.fork_storage.inner.read().unwrap().raw_storage,
+                &self.system_contracts.boojum,
             ))
         } else {
             AnvilVM::ZKSync(Vm::new(batch_env, system_env, storage))

@@ -52,7 +52,7 @@ use zksync_multivm::utils::{
     get_max_gas_per_pubdata_byte,
 };
 use zksync_multivm::vm_latest::constants::{
-    BATCH_COMPUTATIONAL_GAS_LIMIT, BATCH_GAS_LIMIT, MAX_VM_PUBDATA_PER_BATCH,
+    BATCH_COMPUTATIONAL_GAS_LIMIT, MAX_VM_PUBDATA_PER_BATCH,
 };
 use zksync_multivm::vm_latest::{HistoryDisabled, Vm};
 use zksync_multivm::{MultiVmTracer, VmVersion};
@@ -825,11 +825,12 @@ impl InMemoryNodeInner {
                 storage,
                 // TODO: this might be causing a deadlock.. check..
                 &fork_storage.inner.read().unwrap().raw_storage,
+                boojum,
             );
-            // Temporary hack - as we update the 'storage' just above, but zkos loads its full
+            // Temporary hack - as we update the 'storage' just above, but boojumos loads its full
             // state from fork_storage (that is not updated).
             vm.update_inconsistent_keys(&[&nonce_key, &balance_key]);
-            AnvilVM::ZKOs(vm)
+            AnvilVM::BoojumOs(vm)
         } else {
             AnvilVM::ZKSync(Vm::new(batch_env, system_env, storage))
         };
@@ -846,7 +847,9 @@ impl InMemoryNodeInner {
         };
 
         let tx_result = match &mut vm {
-            AnvilVM::ZKOs(vm) => vm.inspect(&mut Default::default(), InspectExecutionMode::OneTx),
+            AnvilVM::BoojumOs(vm) => {
+                vm.inspect(&mut tracer_dispatcher.into(), InspectExecutionMode::OneTx)
+            }
             AnvilVM::ZKSync(vm) => {
                 vm.inspect(&mut tracer_dispatcher.into(), InspectExecutionMode::OneTx)
             }
@@ -878,7 +881,8 @@ impl InMemoryNodeInner {
         } = self.estimate_gas_step(
             tx.clone(),
             gas_per_pubdata_byte,
-            BATCH_GAS_LIMIT,
+            // TODO: check what the max value should be here.
+            MAX_L2_TX_GAS_LIMIT,
             batch_env,
             system_env,
             &self.fork_storage,
