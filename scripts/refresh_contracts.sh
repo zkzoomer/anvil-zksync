@@ -76,7 +76,7 @@ if [[ ! $PROTOCOL_VERSION < v28 ]]; then
   precompiles+=("Modexp")
 fi
 
-if [[ ! $PROTOCOL_VERSION == v29 ]]; then
+if [[ $PROTOCOL_VERSION == v29 ]]; then
   # New L1 contract that was added in v29
   l1_artifacts+=("ChainAssetHandler" "L2MessageVerification")
 fi
