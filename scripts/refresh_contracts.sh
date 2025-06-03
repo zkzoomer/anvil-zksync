@@ -17,7 +17,7 @@ case $PROTOCOL_VERSION in
     ;;
   v29)
     # HEAD of anvil-zksync-0.6.x-draft-v29
-    ERA_CONTRACTS_GIT_COMMIT=10cf7d268bce40153b2781d35d2a036e788107ea
+    ERA_CONTRACTS_GIT_COMMIT=5649d56d916804a200348743577ce043ea4ff3b6
     ;;
   *)
     echo "Unrecognized/unsupported protocol version: $PROTOCOL_VERSION"
