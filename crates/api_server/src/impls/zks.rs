@@ -6,13 +6,12 @@ use jsonrpsee::core::{async_trait, RpcResult};
 use std::collections::HashMap;
 use zksync_types::api::state_override::StateOverride;
 use zksync_types::api::{
-    BlockDetails, BridgeAddresses, L1BatchDetails, L2ToL1LogProof, LogProofTarget, Proof, ProtocolVersion,
-    TransactionDetailedResult, TransactionDetails,
+    BlockDetails, BridgeAddresses, L1BatchDetails, L2ToL1LogProof, LogProofTarget, Proof,
+    ProtocolVersion, TransactionDetails,
 };
 use zksync_types::fee::Fee;
 use zksync_types::fee_model::{FeeParams, PubdataIndependentBatchFeeModelInput};
 use zksync_types::transaction_request::CallRequest;
-use zksync_types::web3::Bytes;
 use zksync_types::{Address, L1BatchNumber, L2BlockNumber, Transaction, H256, U256, U64};
 use zksync_web3_decl::types::Token;
 
