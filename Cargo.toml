@@ -39,7 +39,7 @@ zksync_mini_merkle_tree = { git = "https://github.com/matter-labs/zksync-era", b
 zksync_multivm = { git = "https://github.com/matter-labs/zksync-era", branch = "draft-v29" }
 zksync_contracts = { git = "https://github.com/matter-labs/zksync-era", branch = "draft-v29" }
 zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era", branch = "draft-v29" }
-# zksync_system_constants = { git = "https://github.com/matter-labs/zksync-era", branch = "draft-v29" }
+zksync_system_constants = { git = "https://github.com/matter-labs/zksync-era", branch = "draft-v29" }
 zksync_types = { git = "http://github.com/matter-labs/zksync-era", branch = "draft-v29" }
 zksync_vm_interface = { git = "https://github.com/matter-labs/zksync-era", branch = "draft-v29" }
 zksync_web3_decl = { git = "https://github.com/matter-labs/zksync-era", branch = "draft-v29" }
