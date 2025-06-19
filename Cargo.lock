@@ -1099,6 +1099,7 @@ dependencies = [
  "zksync_error",
  "zksync_mini_merkle_tree",
  "zksync_multivm",
+ "zksync_system_constants",
  "zksync_types",
  "zksync_web3_decl",
 ]
@@ -8445,6 +8446,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "zk_evm"
+version = "0.152.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f13afd76233bbe1f29500db26e9be0bd100194027f7d59201cf2d5643c698b5b"
+dependencies = [
+ "anyhow",
+ "lazy_static",
+ "num",
+ "serde",
+ "serde_json",
+ "static_assertions",
+ "zk_evm_abstractions 0.152.0",
+]
+
+[[package]]
 name = "zk_evm_abstractions"
 version = "0.140.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8494,6 +8510,19 @@ dependencies = [
  "serde",
  "static_assertions",
  "zkevm_opcode_defs 0.152.3",
+]
+
+[[package]]
+name = "zk_evm_abstractions"
+version = "0.152.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c24698b675086c05a5bbc9617e975cbfff1b422791a933685038e3bd818cec2"
+dependencies = [
+ "anyhow",
+ "num_enum 0.6.1",
+ "serde",
+ "static_assertions",
+ "zkevm_opcode_defs 0.152.0",
 ]
 
 [[package]]
@@ -8562,6 +8591,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04f02fb6f185df1aa4f33b18002024c50e73e3f701d25070e7da0c419bb93d77"
 dependencies = [
  "bitflags 2.9.1",
+ "blake2",
+ "ethereum-types",
+ "k256 0.13.4",
+ "lazy_static",
+ "p256",
+ "serde",
+ "sha2",
+ "sha3",
+ "zksync_pairing",
+]
+
+[[package]]
+name = "zkevm_opcode_defs"
+version = "0.152.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cfeb8dda98af21f094199400d10f2ec65d4aa8f9382c339f59be172d493ed351"
+dependencies = [
+ "bitflags 2.9.0",
  "blake2",
  "ethereum-types",
  "k256 0.13.4",

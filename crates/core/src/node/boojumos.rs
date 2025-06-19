@@ -21,9 +21,9 @@ use zksync_multivm::{
 
 use zksync_multivm::MultiVmTracerPointer;
 use zksync_types::{
-    address_to_h256, get_code_key, u256_to_h256, web3::keccak256, AccountTreeId, Address,
-    ExecuteTransactionCommon, StorageKey, StorageLog, StorageLogWithPreviousValue, Transaction,
-    H160, H256, U256,
+     Address,
+    StorageKey, StorageLog Transaction,
+
 };
 
 use crate::deps::InMemoryStorage;
