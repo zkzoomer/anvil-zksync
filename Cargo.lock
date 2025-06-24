@@ -2913,15 +2913,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "envy"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f47e0157f2cb54f5ae1bd371b30a2ae4311e1c028f575cd4e81de7353215965"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8621,7 +8612,7 @@ dependencies = [
 [[package]]
 name = "zksync_basic_types"
 version = "28.6.0-non-semver-compat"
-source = "git+http://github.com/matter-labs/zksync-era?branch=draft-v29#c3581126bc01b90e392d44a7945962af778c7e2e"
+source = "git+http://github.com/matter-labs/zksync-era?branch=sb-precommit-proposal-addresses-in-vt-v29#9fca117a741b948dd5938ff4b048eb2aafe16198"
 dependencies = [
  "anyhow",
  "chrono",
@@ -8638,6 +8629,7 @@ dependencies = [
  "thiserror 2.0.12",
  "tiny-keccak 2.0.2",
  "url",
+ "vise",
 ]
 
 [[package]]
@@ -8666,9 +8658,8 @@ dependencies = [
 [[package]]
 name = "zksync_contracts"
 version = "28.6.0-non-semver-compat"
-source = "git+http://github.com/matter-labs/zksync-era?branch=draft-v29#c3581126bc01b90e392d44a7945962af778c7e2e"
+source = "git+http://github.com/matter-labs/zksync-era?branch=sb-precommit-proposal-addresses-in-vt-v29#9fca117a741b948dd5938ff4b048eb2aafe16198"
 dependencies = [
- "envy",
  "hex",
  "once_cell",
  "serde",
@@ -8680,7 +8671,7 @@ dependencies = [
 [[package]]
 name = "zksync_crypto_primitives"
 version = "28.6.0-non-semver-compat"
-source = "git+http://github.com/matter-labs/zksync-era?branch=draft-v29#c3581126bc01b90e392d44a7945962af778c7e2e"
+source = "git+http://github.com/matter-labs/zksync-era?branch=sb-precommit-proposal-addresses-in-vt-v29#9fca117a741b948dd5938ff4b048eb2aafe16198"
 dependencies = [
  "anyhow",
  "blake2",
@@ -8740,7 +8731,7 @@ dependencies = [
 [[package]]
 name = "zksync_mini_merkle_tree"
 version = "28.6.0-non-semver-compat"
-source = "git+http://github.com/matter-labs/zksync-era?branch=draft-v29#c3581126bc01b90e392d44a7945962af778c7e2e"
+source = "git+http://github.com/matter-labs/zksync-era?branch=sb-precommit-proposal-addresses-in-vt-v29#9fca117a741b948dd5938ff4b048eb2aafe16198"
 dependencies = [
  "once_cell",
  "zksync_basic_types",
@@ -8750,7 +8741,7 @@ dependencies = [
 [[package]]
 name = "zksync_multivm"
 version = "28.6.0-non-semver-compat"
-source = "git+http://github.com/matter-labs/zksync-era?branch=draft-v29#c3581126bc01b90e392d44a7945962af778c7e2e"
+source = "git+http://github.com/matter-labs/zksync-era?branch=sb-precommit-proposal-addresses-in-vt-v29#9fca117a741b948dd5938ff4b048eb2aafe16198"
 dependencies = [
  "anyhow",
  "circuit_sequencer_api",
@@ -8791,7 +8782,7 @@ dependencies = [
 [[package]]
 name = "zksync_system_constants"
 version = "28.6.0-non-semver-compat"
-source = "git+http://github.com/matter-labs/zksync-era?branch=draft-v29#c3581126bc01b90e392d44a7945962af778c7e2e"
+source = "git+http://github.com/matter-labs/zksync-era?branch=sb-precommit-proposal-addresses-in-vt-v29#9fca117a741b948dd5938ff4b048eb2aafe16198"
 dependencies = [
  "once_cell",
  "zksync_basic_types",
@@ -8817,7 +8808,7 @@ dependencies = [
 [[package]]
 name = "zksync_types"
 version = "28.6.0-non-semver-compat"
-source = "git+http://github.com/matter-labs/zksync-era?branch=draft-v29#c3581126bc01b90e392d44a7945962af778c7e2e"
+source = "git+http://github.com/matter-labs/zksync-era?branch=sb-precommit-proposal-addresses-in-vt-v29#9fca117a741b948dd5938ff4b048eb2aafe16198"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8843,7 +8834,7 @@ dependencies = [
 [[package]]
 name = "zksync_utils"
 version = "28.6.0-non-semver-compat"
-source = "git+http://github.com/matter-labs/zksync-era?branch=draft-v29#c3581126bc01b90e392d44a7945962af778c7e2e"
+source = "git+http://github.com/matter-labs/zksync-era?branch=sb-precommit-proposal-addresses-in-vt-v29#9fca117a741b948dd5938ff4b048eb2aafe16198"
 dependencies = [
  "anyhow",
  "once_cell",
@@ -8876,7 +8867,7 @@ dependencies = [
 [[package]]
 name = "zksync_vm_interface"
 version = "28.6.0-non-semver-compat"
-source = "git+http://github.com/matter-labs/zksync-era?branch=draft-v29#c3581126bc01b90e392d44a7945962af778c7e2e"
+source = "git+http://github.com/matter-labs/zksync-era?branch=sb-precommit-proposal-addresses-in-vt-v29#9fca117a741b948dd5938ff4b048eb2aafe16198"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -8893,7 +8884,7 @@ dependencies = [
 [[package]]
 name = "zksync_web3_decl"
 version = "28.6.0-non-semver-compat"
-source = "git+http://github.com/matter-labs/zksync-era?branch=draft-v29#c3581126bc01b90e392d44a7945962af778c7e2e"
+source = "git+http://github.com/matter-labs/zksync-era?branch=sb-precommit-proposal-addresses-in-vt-v29#9fca117a741b948dd5938ff4b048eb2aafe16198"
 dependencies = [
  "anyhow",
  "async-trait",
